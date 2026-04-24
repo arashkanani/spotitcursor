@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Match Game - Mobile Player</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page">
+    <div class="mobile-wrap card" id="joinCard">
+      <h2>Join Game</h2>
+      <input id="nameInput" placeholder="Enter your name" maxlength="20">
+      <button id="joinBtn">Join as Player</button>
+      <p class="status" id="joinMessage">Use this page on mobile. Host screen is on /</p>
+    </div>
+
+    <div class="mobile-wrap hidden" id="gameCard">
+      <div class="card">
+        <h2 id="playerName">Player</h2>
+        <p class="status" id="mobileStatus">Waiting for host to start the game...</p>
+      </div>
+
+      <div class="card" style="margin-top:1rem;">
+        <h3>Pick the common shape fast</h3>
+        <div class="shape-grid" id="shapeGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const joinCard = document.getElementById("joinCard");
+    const gameCard = document.getElementById("gameCard");
+    const nameInput = document.getElementById("nameInput");
+    const joinBtn = document.getElementById("joinBtn");
+    const joinMessage = document.getElementById("joinMessage");
+    const playerName = document.getElementById("playerName");
+    const mobileStatus = document.getElementById("mobileStatus");
+    const shapeGrid = document.getElementById("shapeGrid");
+
+    let joined = false;
+    let selectedName = "";
+    let canPick = false;
+    let shapePool = [];
+
+    function renderShapeButtons(shapes) {
+      shapeGrid.innerHTML = "";
+      (shapes || []).forEach((shape) => {
+        const btn = document.createElement("button");
+        btn.className = "shape-btn";
+        const src = String(shape);
+        btn.innerHTML = `<img class="shape-btn-photo" src="${src}" alt="shape">`;
+        const img = btn.querySelector("img");
+        img.addEventListener("error", () => {
+          btn.innerHTML = `<span class="shape-icon">⬤</span>`;
+        });
+        btn.title = "shape";
+        btn.setAttribute("aria-label", "shape");
+        btn.addEventListener("click", () => {
+          if (!joined || !canPick) return;
+          socket.emit("playerPick", { shape });
+        });
+        shapeGrid.appendChild(btn);
+      });
+    }
+
+    joinBtn.addEventListener("click", () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        joinMessage.textContent = "Please enter your name.";
+        return;
+      }
+      socket.emit("joinPlayer", { name });
+    });
+
+    socket.on("joinError", (data) => {
+      joinMessage.textContent = data.message || "Could not join.";
+    });
+
+    socket.on("joined", (data) => {
+      joined = true;
+      selectedName = data.name;
+      playerName.textContent = `Player: ${selectedName}`;
+      joinCard.classList.add("hidden");
+      gameCard.classList.remove("hidden");
+      mobileStatus.textContent = "Joined. Waiting for host to start...";
+    });
+
+    socket.on("gameState", (state) => {
+      if (Array.isArray(state.shapePool) && state.shapePool.length) {
+        const needsRebuild = shapePool.length !== state.shapePool.length
+          || shapePool.some((v, i) => v !== state.shapePool[i]);
+        if (needsRebuild) {
+          shapePool = [...state.shapePool];
+          renderShapeButtons(shapePool);
+        }
+      }
+
+      if (!joined) return;
+      canPick = state.started && !state.ended;
+
+      if (!state.started && !state.ended) {
+        mobileStatus.textContent = "Waiting for host to start...";
+      } else if (state.ended) {
+        const me = (state.leaderboard || []).find((p) => p.name === selectedName);
+        mobileStatus.textContent = `Game ended. Your score: ${me ? me.score : 0}`;
+      } else {
+        mobileStatus.textContent = `Round ${state.roundNumber} / ${state.totalRounds} - pick now`;
+      }
+    });
+
+    socket.on("roundWinner", (data) => {
+      if (!joined) return;
+      canPick = false;
+      mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}. Correct shape: ${data.correctShape}`;
+    });
+
+    socket.on("gameOver", (data) => {
+      if (!joined) return;
+      canPick = false;
+      if (!data.leaderboard.length) {
+        mobileStatus.textContent = "Game ended.";
+        return;
+      }
+      mobileStatus.textContent = `Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score})`;
+    });
+  </script>
+</body>
+</html>

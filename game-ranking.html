@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game – Ranking (scroll to last player)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #e8e8e8;
+    }
+    .container { max-width: 420px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin: 0 0 20px; color: #fff; }
+    .game-area {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .score-display { font-size: 1.1rem; margin-bottom: 16px; color: #8af; }
+    button {
+      padding: 12px 24px;
+      cursor: pointer;
+      background: #4a9;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    button:hover { background: #5ba; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ranking-section { margin-top: 24px; }
+    .ranking-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 12px; color: #fff; }
+    .ranking-list {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(15, 52, 96, 0.5);
+      padding: 8px 0;
+    }
+    .ranking-list::-webkit-scrollbar { width: 8px; }
+    .ranking-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+    .ranking-list::-webkit-scrollbar-thumb { background: #4a9; border-radius: 4px; }
+    .ranking-item {
+      padding: 14px 18px;
+      margin: 4px 10px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: background 0.2s;
+    }
+    .ranking-item:hover { background: rgba(255,255,255,0.06); }
+    .ranking-item.current-player {
+      background: rgba(74, 169, 153, 0.2);
+      border: 2px solid #4a9;
+      box-shadow: 0 0 16px rgba(74, 169, 153, 0.25);
+    }
+    .rank-num { font-weight: 700; min-width: 36px; color: #888; font-size: 0.95rem; }
+    .ranking-item.current-player .rank-num { color: #4a9; }
+    .player-name { flex: 1; font-weight: 500; }
+    .player-score { color: #8af; font-weight: 600; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Game & Ranking</h1>
+
+    <div class="game-area" id="gameArea">
+      <p class="score-display">Score: <strong id="currentScore">0</strong></p>
+      <p style="margin-bottom:16px;color:#aaa;">Click to add points. Finish when ready.</p>
+      <button id="addScore">+100 points</button>
+      <button id="finishGame">Finish game</button>
+    </div>
+
+    <div class="ranking-section hidden" id="rankingSection">
+      <div class="ranking-title">Ranking</div>
+      <div class="ranking-list" id="rankingList"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const RANKING_DATA = [
+        { name: 'Alice', score: 9850 },
+        { name: 'Bob', score: 9200 },
+        { name: 'Carol', score: 8800 },
+        { name: 'Dave', score: 8450 },
+        { name: 'Eve', score: 8100 },
+        { name: 'Frank', score: 7700 },
+        { name: 'Grace', score: 7200 },
+        { name: 'You', score: 0 },
+        { name: 'Ivy', score: 6400 },
+        { name: 'Jack', score: 6000 },
+        { name: 'Kate', score: 5500 },
+        { name: 'Leo', score: 5000 },
+        { name: 'Mia', score: 4500 },
+        { name: 'Noah', score: 4000 },
+        { name: 'Oscar', score: 3500 },
+      ];
+
+      const LAST_PLAYER_INDEX = 7;
+
+      let currentScore = 0;
+      const gameArea = document.getElementById('gameArea');
+      const rankingSection = document.getElementById('rankingSection');
+      const rankingList = document.getElementById('rankingList');
+      const currentScoreEl = document.getElementById('currentScore');
+      const addScoreBtn = document.getElementById('addScore');
+      const finishBtn = document.getElementById('finishGame');
+
+      function renderRanking(myScore) {
+        const data = RANKING_DATA.slice();
+        data[LAST_PLAYER_INDEX] = { ...data[LAST_PLAYER_INDEX], score: myScore };
+        data.sort((a, b) => b.score - a.score);
+        const myRank = data.findIndex(p => p.name === 'You');
+
+        rankingList.innerHTML = data.map((p, i) => `
+          <div class="ranking-item ${p.name === 'You' ? 'current-player' : ''}" data-index="${i}">
+            <span class="rank-num">#${i + 1}</span>
+            <span class="player-name">${p.name}</span>
+            <span class="player-score">${p.score}</span>
+          </div>
+        `).join('');
+
+        return myRank;
+      }
+
+      function scrollToLastPlayerInMiddle() {
+        const container = rankingList;
+        const lastPlayerRow = container.querySelector('.ranking-item.current-player');
+        if (!lastPlayerRow) return;
+
+        const containerHeight = container.clientHeight;
+        const rowTop = lastPlayerRow.offsetTop;
+        const rowHeight = lastPlayerRow.offsetHeight;
+        const scrollTarget = rowTop - (containerHeight / 2) + (rowHeight / 2);
+        const maxScroll = container.scrollHeight - containerHeight;
+        const clampedScroll = Math.max(0, Math.min(scrollTarget, maxScroll));
+
+        container.scrollTo({ top: clampedScroll, behavior: 'smooth' });
+      }
+
+      function onGameFinish() {
+        RANKING_DATA[LAST_PLAYER_INDEX].score = currentScore;
+        gameArea.classList.add('hidden');
+        rankingSection.classList.remove('hidden');
+        renderRanking(currentScore);
+        requestAnimationFrame(function () {
+          requestAnimationFrame(scrollToLastPlayerInMiddle);
+        });
+      }
+
+      addScoreBtn.addEventListener('click', function () {
+        currentScore += 100;
+        currentScoreEl.textContent = currentScore;
+      });
+
+      finishBtn.addEventListener('click', onGameFinish);
+
+      currentScoreEl.textContent = '0';
+    })();
+  </script>
+</body>
+</html>

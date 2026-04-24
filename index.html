@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mood Recipe Recommender</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded shadow-md w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Mood-Based Recipe Recommender</h1>
+    <label for="mood" class="block mb-2 font-medium">Select your mood:</label>
+    <select id="mood" class="w-full p-2 border rounded mb-4">
+      <option value="">-- Choose a mood --</option>
+      <option value="happy">Happy</option>
+      <option value="sad">Sad</option>
+      <option value="energetic">Energetic</option>
+      <option value="relaxed">Relaxed</option>
+    </select>
+    <button id="getRecipe" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 mb-4">Get Recipe</button>
+    <div id="recipeBox" class="hidden mt-4 p-4 border rounded bg-blue-50">
+      <h2 id="recipeTitle" class="text-xl font-semibold mb-2"></h2>
+      <p id="recipeDesc" class="mb-4"></p>
+      <button id="newRecipe" class="bg-green-500 text-white py-1 px-4 rounded hover:bg-green-600">Show Another Recipe</button>
+    </div>
+    <div id="errorBox" class="hidden mt-4 p-4 border rounded bg-red-100 text-red-700"></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html> 

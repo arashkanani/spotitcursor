@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Match Game - Host Screen</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+  <div class="page">
+    <div class="topbar">
+      <h2>Host Screen</h2>
+      <button id="startBtn">Start 20-Round Game</button>
+    </div>
+
+    <p class="status" id="statusText">Waiting to start...</p>
+
+    <div class="layout">
+      <section class="card">
+        <h3>Two Circles</h3>
+        <div class="circles">
+          <div class="circle" id="leftCircle"></div>
+          <div class="circle" id="rightCircle"></div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h3>Live Ranking</h3>
+        <ul class="rank-list" id="rankingList"></ul>
+      </aside>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const leftCircle = document.getElementById("leftCircle");
+    const rightCircle = document.getElementById("rightCircle");
+    const rankingList = document.getElementById("rankingList");
+    const statusText = document.getElementById("statusText");
+    const startBtn = document.getElementById("startBtn");
+    const bodyEl = document.body;
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function getShapePosition(radius, tokenRadius) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.sqrt(Math.random()) * (radius - tokenRadius - 8);
+      return { x: radius + Math.cos(angle) * distance, y: radius + Math.sin(angle) * distance };
+    }
+
+    function distance(a, b) {
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function buildNonOverlappingLayout(shapeCount, radius, minSize, maxSize) {
+      const tokens = [];
+      const margin = 7;
+
+      // Split the circle into angular sectors for homogeneous coverage.
+      const sectorCenters = Array.from({ length: shapeCount }, (_, i) => {
+        return (i + 0.5) * ((Math.PI * 2) / shapeCount);
+      });
+      // Shuffle sectors so distribution stays random each round.
+      for (let i = sectorCenters.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [sectorCenters[i], sectorCenters[j]] = [sectorCenters[j], sectorCenters[i]];
+      }
+
+      for (let i = 0; i < shapeCount; i += 1) {
+        const tokenSize = randomInRange(minSize, maxSize);
+        const tokenRadius = tokenSize / 2;
+        const sectorBase = sectorCenters[i];
+        let placed = null;
+
+        for (let attempt = 0; attempt < 120; attempt += 1) {
+          // Keep each item mostly inside its sector, but with random disturbance.
+          const angle = sectorBase + randomInRange(-0.23, 0.23);
+          // Radius distribution favors middle ring for balanced fill.
+          const radialUnit = randomInRange(0.2, 0.95);
+          const distanceFromCenter = radialUnit * (radius - tokenRadius - 10);
+          const point = {
+            x: radius + Math.cos(angle) * distanceFromCenter,
+            y: radius + Math.sin(angle) * distanceFromCenter,
+            r: tokenRadius,
+            size: tokenSize
+          };
+
+          const noCollision = tokens.every((t) => distance(t, point) >= (t.r + point.r + margin));
+          if (noCollision) {
+            placed = point;
+            break;
+          }
+        }
+
+        // Safe fallback (very rare): shrink and place with broader search.
+        if (!placed) {
+          const fallbackRadius = tokenRadius * 0.82;
+          for (let attempt = 0; attempt < 160; attempt += 1) {
+            const point = getShapePosition(radius, fallbackRadius);
+            point.r = fallbackRadius;
+            point.size = fallbackRadius * 2;
+            const noCollision = tokens.every((t) => distance(t, point) >= (t.r + point.r + margin));
+            if (noCollision) {
+              placed = point;
+              break;
+            }
+          }
+        }
+
+        if (placed) tokens.push(placed);
+      }
+
+      return tokens;
+    }
+
+    function renderShapes(container, shapes) {
+      container.innerHTML = "";
+      const size = Math.min(container.clientWidth, container.clientHeight);
+      const radius = size / 2;
+      const minSize = size * 0.12;
+      const maxSize = size * 0.2;
+      const layout = buildNonOverlappingLayout((shapes || []).length, radius, minSize, maxSize);
+
+      (shapes || []).forEach((shape, index) => {
+        const slot = layout[index];
+        if (!slot) return;
+        const item = document.createElement("div");
+
+        item.className = "shape";
+        item.style.left = `${slot.x}px`;
+        item.style.top = `${slot.y}px`;
+        item.style.width = `${slot.size}px`;
+        item.style.height = `${slot.size}px`;
+        item.style.opacity = String(randomInRange(0.45, 0.95));
+        item.style.transform = `translate(-50%, -50%) rotate(${randomInRange(-28, 28)}deg)`;
+        item.style.setProperty("--shape-size", `${slot.size * 0.58}px`);
+        const src = String(shape);
+        item.innerHTML = `<img class="shape-photo" src="${src}" alt="shape">`;
+        const img = item.querySelector("img");
+        img.addEventListener("error", () => {
+          item.innerHTML = `<span class="shape-icon">⬤</span>`;
+        });
+        container.appendChild(item);
+      });
+    }
+
+    function renderRanking(leaderboard) {
+      rankingList.innerHTML = "";
+      if (!leaderboard || leaderboard.length === 0) {
+        rankingList.innerHTML = "<li class='rank-item'><span>No players yet</span><span>0</span></li>";
+        return;
+      }
+      leaderboard.forEach((player, index) => {
+        const li = document.createElement("li");
+        li.className = "rank-item";
+        if (index === 0) li.classList.add("rank-first");
+        if (index === 1) li.classList.add("rank-second");
+        if (index === 2) li.classList.add("rank-third");
+        const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "•";
+        li.innerHTML = `<span>${medal} ${player.name}</span><strong>${player.score}</strong>`;
+        rankingList.appendChild(li);
+      });
+    }
+
+    socket.on("gameState", (state) => {
+      renderRanking(state.leaderboard);
+      startBtn.disabled = state.started && !state.ended;
+
+      if (!state.started && !state.ended) {
+        statusText.textContent = "Waiting to start...";
+      } else if (state.ended) {
+        statusText.textContent = "Game ended.";
+      } else {
+        statusText.textContent = `Round ${state.roundNumber} / ${state.totalRounds}`;
+      }
+
+      renderShapes(leftCircle, state.currentRound ? state.currentRound.leftShapes : []);
+      renderShapes(rightCircle, state.currentRound ? state.currentRound.rightShapes : []);
+    });
+
+    socket.on("roundWinner", (data) => {
+      statusText.textContent = `Round ${data.roundNumber}: ${data.winner.name} found the match first`;
+      bodyEl.classList.add("winner-flash");
+      setTimeout(() => bodyEl.classList.remove("winner-flash"), 700);
+    });
+
+    socket.on("gameOver", (data) => {
+      if (!data.leaderboard.length) {
+        statusText.textContent = "Game over. No players joined.";
+        return;
+      }
+      statusText.textContent = `Game over. Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score})`;
+    });
+
+    startBtn.addEventListener("click", () => {
+      socket.emit("hostStartGame");
+    });
+  </script>
+</body>
+</html>
