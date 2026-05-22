@@ -4,20 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Shape Match Game - Mobile Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="mobile-body">
+  <div class="bg-mesh"></div>
+  <div class="bg-vignette"></div>
   <div class="page">
     <div class="mobile-wrap card" id="joinCard">
       <h2>Join Game</h2>
-      <input id="nameInput" placeholder="Enter your name" maxlength="20">
-      <button id="joinBtn">Join as Player</button>
-      <p class="status" id="joinMessage">Use this page on mobile. Host screen is on /</p>
+
+      <label class="field-label" for="nameInput">Your name</label>
+      <input id="nameInput" placeholder="Enter your name" maxlength="20" autocomplete="name">
+
+      <label class="field-label">Your photo</label>
+      <div class="photo-row">
+        <img id="photoPreview" class="photo-preview hidden" alt="Your photo preview">
+        <label class="photo-upload-btn">
+          <input id="photoInput" type="file" accept="image/*" capture="user" hidden>
+          Take / choose photo
+        </label>
+      </div>
+
+      <label class="field-label" for="countrySearch">Your country</label>
+      <div class="country-picker">
+        <input id="countrySearch" type="search" placeholder="Type country name to search..." autocomplete="off">
+        <ul id="countryResults" class="country-results hidden"></ul>
+        <div id="countryChosen" class="country-chosen hidden" aria-live="polite"></div>
+      </div>
+
+      <button id="joinBtn" disabled>Join as Player</button>
+      <p class="status" id="joinMessage">Scan the QR on the host screen, then fill in your details.</p>
     </div>
 
     <div class="mobile-wrap hidden" id="gameCard">
       <div class="card">
-        <h2 id="playerName">Player</h2>
+        <div id="playerHeader" class="player-header"></div>
         <p class="status" id="mobileStatus">Waiting for host to start the game...</p>
       </div>
 
@@ -29,21 +53,151 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/player-ui.js"></script>
   <script>
-    const socket = io();
+    const socket = io({ transports: ["websocket", "polling"] });
+
     const joinCard = document.getElementById("joinCard");
     const gameCard = document.getElementById("gameCard");
     const nameInput = document.getElementById("nameInput");
+    const photoInput = document.getElementById("photoInput");
+    const photoPreview = document.getElementById("photoPreview");
+    const countrySearch = document.getElementById("countrySearch");
+    const countryResults = document.getElementById("countryResults");
+    const countryChosen = document.getElementById("countryChosen");
     const joinBtn = document.getElementById("joinBtn");
     const joinMessage = document.getElementById("joinMessage");
-    const playerName = document.getElementById("playerName");
+    const playerHeader = document.getElementById("playerHeader");
     const mobileStatus = document.getElementById("mobileStatus");
     const shapeGrid = document.getElementById("shapeGrid");
 
     let joined = false;
-    let selectedName = "";
+    let myProfile = null;
     let canPick = false;
     let shapePool = [];
+    let photoDataUrl = "";
+    let allCountries = [];
+    let selectedCountryCode = "";
+
+    function updateJoinButtonState() {
+      const ready = nameInput.value.trim()
+        && photoDataUrl
+        && selectedCountryCode;
+      joinBtn.disabled = !ready;
+    }
+
+    function filterCountries(query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return allCountries.slice(0, 40);
+      return allCountries
+        .filter((country) => country.name.toLowerCase().includes(q))
+        .slice(0, 40);
+    }
+
+    function renderCountryResults(list) {
+      countryResults.innerHTML = "";
+      if (!list.length) {
+        countryResults.classList.add("hidden");
+        return;
+      }
+
+      list.forEach((country) => {
+        const li = document.createElement("li");
+        li.className = "country-result-item";
+        li.innerHTML = `<img class="country-opt-flag" src="${countryFlagUrl(country.code)}" alt="" width="28" height="21"><span>${escapeHtml(country.name)}</span>`;
+        li.addEventListener("click", () => selectCountry(country));
+        countryResults.appendChild(li);
+      });
+      countryResults.classList.remove("hidden");
+    }
+
+    function selectCountry(country) {
+      selectedCountryCode = country.code;
+      countryChosen.innerHTML = `<img class="country-chosen-flag" src="${countryFlagUrl(country.code)}" alt="" width="36" height="27">`;
+      countryChosen.classList.remove("hidden");
+      countrySearch.value = country.name;
+      countryResults.classList.add("hidden");
+      updateJoinButtonState();
+    }
+
+    function openCountryResults() {
+      renderCountryResults(filterCountries(countrySearch.value));
+    }
+
+    function resizePhoto(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          const maxSide = 360;
+          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(objectUrl);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error("Could not read image."));
+        };
+        img.src = objectUrl;
+      });
+    }
+
+    photoInput.addEventListener("change", async () => {
+      const file = photoInput.files && photoInput.files[0];
+      if (!file) return;
+      try {
+        photoDataUrl = await resizePhoto(file);
+        photoPreview.src = photoDataUrl;
+        photoPreview.classList.remove("hidden");
+        joinMessage.textContent = "Photo ready.";
+      } catch (_error) {
+        photoDataUrl = "";
+        joinMessage.textContent = "Could not use that photo. Try again.";
+      }
+      updateJoinButtonState();
+    });
+
+    nameInput.addEventListener("input", updateJoinButtonState);
+
+    countrySearch.addEventListener("input", () => {
+      selectedCountryCode = "";
+      countryChosen.classList.add("hidden");
+      openCountryResults();
+      updateJoinButtonState();
+    });
+
+    countrySearch.addEventListener("focus", openCountryResults);
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest(".country-picker")) {
+        countryResults.classList.add("hidden");
+      }
+    });
+
+    fetch("/api/countries")
+      .then((res) => res.json())
+      .then((countries) => {
+        allCountries = countries;
+        countrySearch.placeholder = "Type country name to search...";
+        updateJoinButtonState();
+      })
+      .catch(() => {
+        countrySearch.placeholder = "Could not load countries";
+      });
+
+    socket.on("connect_error", () => {
+      joinMessage.textContent = "Cannot reach game server. Use your PC's IP (same Wi‑Fi), not localhost.";
+    });
+
+    socket.on("connect", () => {
+      if (!joined) {
+        joinMessage.textContent = "Connected. Enter your details and join.";
+      }
+    });
 
     function renderShapeButtons(shapes) {
       shapeGrid.innerHTML = "";
@@ -72,17 +226,39 @@
         joinMessage.textContent = "Please enter your name.";
         return;
       }
-      socket.emit("joinPlayer", { name });
+      if (!photoDataUrl) {
+        joinMessage.textContent = "Please take or upload a photo.";
+        return;
+      }
+      if (!selectedCountryCode) {
+        joinMessage.textContent = "Please search and pick your country from the list.";
+        return;
+      }
+      joinBtn.disabled = true;
+      joinMessage.textContent = "Joining...";
+      socket.emit("joinPlayer", {
+        name,
+        photo: photoDataUrl,
+        countryCode: selectedCountryCode
+      });
     });
 
     socket.on("joinError", (data) => {
+      joinBtn.disabled = false;
+      updateJoinButtonState();
       joinMessage.textContent = data.message || "Could not join.";
     });
 
     socket.on("joined", (data) => {
       joined = true;
-      selectedName = data.name;
-      playerName.textContent = `Player: ${selectedName}`;
+      myProfile = {
+        name: data.name,
+        photo: data.photo,
+        countryCode: data.countryCode,
+        countryName: data.countryName,
+        score: 0
+      };
+      playerHeader.innerHTML = renderPlayerProfile(myProfile);
       joinCard.classList.add("hidden");
       gameCard.classList.remove("hidden");
       mobileStatus.textContent = "Joined. Waiting for host to start...";
@@ -101,10 +277,15 @@
       if (!joined) return;
       canPick = state.started && !state.ended;
 
+      const me = (state.leaderboard || []).find((p) => p.id === myProfile?.id || p.name === myProfile?.name);
+      if (me) {
+        myProfile.score = me.score;
+        playerHeader.innerHTML = renderPlayerProfile(myProfile);
+      }
+
       if (!state.started && !state.ended) {
         mobileStatus.textContent = "Waiting for host to start...";
       } else if (state.ended) {
-        const me = (state.leaderboard || []).find((p) => p.name === selectedName);
         mobileStatus.textContent = `Game ended. Your score: ${me ? me.score : 0}`;
       } else {
         mobileStatus.textContent = `Round ${state.roundNumber} / ${state.totalRounds} - pick now`;
@@ -114,7 +295,7 @@
     socket.on("roundWinner", (data) => {
       if (!joined) return;
       canPick = false;
-      mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}. Correct shape: ${data.correctShape}`;
+      mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}.`;
     });
 
     socket.on("gameOver", (data) => {

@@ -4,45 +4,417 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Shape Match Game - Host Screen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <script src="/player-ui.js"></script>
 </head>
 <body>
+  <div class="bg-mesh"></div>
+  <div class="bg-vignette"></div>
   <div class="bg-orb orb-1"></div>
   <div class="bg-orb orb-2"></div>
   <div class="bg-orb orb-3"></div>
+  <div class="bg-sparkle"></div>
   <div class="page">
-    <div class="topbar">
-      <h2>Host Screen</h2>
-      <button id="startBtn">Start 20-Round Game</button>
-    </div>
-
-    <p class="status" id="statusText">Waiting to start...</p>
-
-    <div class="layout">
-      <section class="card">
-        <h3>Two Circles</h3>
-        <div class="circles">
-          <div class="circle" id="leftCircle"></div>
-          <div class="circle" id="rightCircle"></div>
+    <section id="setupView" class="host-setup">
+      <div class="setup-card card">
+        <div class="setup-intro">
+          <p class="event-eyebrow">Step 1</p>
+          <h2 class="setup-title">Event branding</h2>
+          <p class="setup-subtitle">Set your event title and sponsor logos. They appear on every game screen.</p>
         </div>
-      </section>
 
-      <aside class="card">
-        <h3>Live Ranking</h3>
-        <ul class="rank-list" id="rankingList"></ul>
-      </aside>
+        <label class="field-label" for="eventTitleInput">Event title</label>
+        <input id="eventTitleInput" type="text" placeholder="e.g. Gulf Innovation Championship 2026" maxlength="80">
+
+        <div class="setup-sponsors-head">
+          <label class="field-label">Sponsor logos</label>
+          <button type="button" id="addSponsorBtn" class="btn-secondary">+ Add sponsor</button>
+        </div>
+        <div id="sponsorUploadList" class="sponsor-upload-list"></div>
+
+        <p class="setup-preview-label">Live preview</p>
+        <header class="event-branding-bar setup-preview-bar">
+          <div class="event-branding-main">
+            <p class="event-eyebrow">Presented by</p>
+            <h2 class="event-title" data-event-title>Your Event Title</h2>
+          </div>
+          <div class="sponsor-strip" data-sponsor-strip></div>
+        </header>
+
+        <p class="status" id="setupMessage"></p>
+        <button type="button" id="continueToLobbyBtn" class="start-game-btn">Continue to player lobby →</button>
+      </div>
+    </section>
+
+    <section id="lobbyView" class="host-lobby hidden">
+      <header class="event-branding-bar">
+        <div class="event-branding-main">
+          <p class="event-eyebrow">Live Event</p>
+          <h2 class="event-title" data-event-title>Shape Match</h2>
+        </div>
+        <div class="sponsor-strip" data-sponsor-strip></div>
+        <button type="button" id="editEventBtn" class="edit-event-btn" title="Edit event branding">Edit</button>
+      </header>
+      <p class="lobby-subtitle">Players scan the QR code, register, then you start the game.</p>
+
+      <div class="lobby-grid">
+        <div class="card qr-card">
+          <div class="card-title-row"><span class="card-icon">📲</span><h3>Scan to join</h3></div>
+          <div class="qr-wrap">
+            <img id="qrImage" class="qr-image" alt="QR code to join the game" width="320" height="320">
+          </div>
+          <p class="join-url" id="playerJoinUrl">Loading join link...</p>
+          <p class="join-hint">Phone must be on the same Wi‑Fi as this PC (not mobile data only).</p>
+        </div>
+
+        <div class="card lobby-players-card leaderboard-panel">
+          <div class="card-title-row"><span class="card-icon">👥</span><h3>Players joined</h3></div>
+          <ul class="rank-list lobby-player-list" id="lobbyPlayerList"></ul>
+          <p class="lobby-waiting" id="lobbyStatus">Waiting for players to scan and join...</p>
+        </div>
+      </div>
+
+      <div class="lobby-actions">
+        <button id="startBtn" class="start-game-btn">Start 20-Round Game</button>
+      </div>
+    </section>
+
+    <section id="gameView" class="host-game hidden">
+      <header class="event-branding-bar game-branding-bar">
+        <div class="event-branding-main">
+          <p class="event-eyebrow">Live Event</p>
+          <h2 class="event-title" data-event-title>Shape Match</h2>
+        </div>
+        <div class="sponsor-strip" data-sponsor-strip></div>
+        <div class="round-pill" id="statusText">Round 1 / 20</div>
+      </header>
+
+      <div class="layout">
+        <section class="card game-board-card">
+          <div class="circles">
+            <div class="circle" id="leftCircle"></div>
+            <div class="circle" id="rightCircle"></div>
+          </div>
+        </section>
+
+        <aside class="card leaderboard-panel">
+          <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
+          <ul class="rank-list" id="rankingList"></ul>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <div id="roundWinnerOverlay" class="round-winner-overlay" aria-hidden="true">
+    <div class="round-winner-backdrop"></div>
+    <div class="round-winner-rays" aria-hidden="true"></div>
+    <div class="round-winner-particles" aria-hidden="true"></div>
+    <div class="round-winner-content">
+      <p class="round-winner-eyebrow">Round Winner</p>
+      <div class="round-winner-photo-wrap">
+        <div class="round-winner-ring" aria-hidden="true"></div>
+        <img id="roundWinnerPhoto" class="round-winner-photo" alt="">
+        <div id="roundWinnerPhotoFallback" class="round-winner-photo-fallback hidden" aria-hidden="true">?</div>
+      </div>
+      <div class="round-winner-meta">
+        <img id="roundWinnerFlag" class="round-winner-flag" alt="" hidden>
+        <h2 id="roundWinnerName" class="round-winner-name"></h2>
+      </div>
+      <p id="roundWinnerRound" class="round-winner-round"></p>
     </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    const setupView = document.getElementById("setupView");
+    const lobbyView = document.getElementById("lobbyView");
+    const gameView = document.getElementById("gameView");
+    const eventTitleInput = document.getElementById("eventTitleInput");
+    const sponsorUploadList = document.getElementById("sponsorUploadList");
+    const addSponsorBtn = document.getElementById("addSponsorBtn");
+    const continueToLobbyBtn = document.getElementById("continueToLobbyBtn");
+    const setupMessage = document.getElementById("setupMessage");
+    const editEventBtn = document.getElementById("editEventBtn");
+    const playerJoinUrl = document.getElementById("playerJoinUrl");
+    const qrImage = document.getElementById("qrImage");
+    const lobbyPlayerList = document.getElementById("lobbyPlayerList");
+    const lobbyStatus = document.getElementById("lobbyStatus");
     const leftCircle = document.getElementById("leftCircle");
     const rightCircle = document.getElementById("rightCircle");
     const rankingList = document.getElementById("rankingList");
     const statusText = document.getElementById("statusText");
     const startBtn = document.getElementById("startBtn");
     const bodyEl = document.body;
+
+    let primaryJoinUrl = "";
+    let latestLeaderboard = [];
+    let currentEventBranding = { title: "", sponsors: [] };
+    const MAX_SPONSOR_SLOTS = 8;
+
+    function renderSponsorStrip(container, sponsors) {
+      container.innerHTML = "";
+      if (!sponsors || !sponsors.length) {
+        container.classList.add("is-empty");
+        return;
+      }
+      container.classList.remove("is-empty");
+      sponsors.forEach((sponsor, index) => {
+        const item = document.createElement("div");
+        item.className = "sponsor-logo-item";
+        const safeName = escapeHtml(sponsor.name || `Sponsor ${index + 1}`);
+        item.innerHTML = `<img src="${sponsor.logo}" alt="${safeName}">`;
+        container.appendChild(item);
+      });
+    }
+
+    function applyEventBranding(branding) {
+      currentEventBranding = branding || { title: "", sponsors: [] };
+      const title = currentEventBranding.title || "Shape Match";
+      document.querySelectorAll("[data-event-title]").forEach((el) => {
+        el.textContent = title;
+      });
+      document.querySelectorAll("[data-sponsor-strip]").forEach((el) => {
+        renderSponsorStrip(el, currentEventBranding.sponsors);
+      });
+      if (eventTitleInput) {
+        eventTitleInput.value = currentEventBranding.title || "";
+      }
+    }
+
+    function updateSetupPreview() {
+      const previewSponsors = [];
+      sponsorUploadList.querySelectorAll(".sponsor-upload-row").forEach((row, index) => {
+        const logo = row.dataset.logo || "";
+        if (!logo) return;
+        const nameInput = row.querySelector("[data-sponsor-name]");
+        previewSponsors.push({
+          name: nameInput?.value.trim() || `Sponsor ${index + 1}`,
+          logo
+        });
+      });
+      applyEventBranding({
+        title: eventTitleInput.value.trim() || "Your Event Title",
+        sponsors: previewSponsors
+      });
+    }
+
+    function resizeLogoFile(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          const maxSide = 420;
+          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(objectUrl);
+          resolve(canvas.toDataURL("image/png", 0.92));
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error("Could not read logo."));
+        };
+        img.src = objectUrl;
+      });
+    }
+
+    function addSponsorUploadRow(existing) {
+      if (sponsorUploadList.children.length >= MAX_SPONSOR_SLOTS) return;
+
+      const row = document.createElement("div");
+      row.className = "sponsor-upload-row";
+      row.innerHTML = `
+        <div class="sponsor-upload-preview-wrap hidden" data-preview-wrap>
+          <img class="sponsor-upload-thumb" data-preview-img alt="">
+        </div>
+        <div class="sponsor-upload-fields">
+          <label class="sponsor-file-label">
+            <input type="file" accept="image/*" data-sponsor-file hidden>
+            Upload logo
+          </label>
+          <input type="text" class="sponsor-name-input" data-sponsor-name placeholder="Sponsor name (optional)" maxlength="48">
+          <button type="button" class="sponsor-remove-btn" data-remove-sponsor>Remove</button>
+        </div>
+      `;
+
+      const fileInput = row.querySelector("[data-sponsor-file]");
+      const nameInput = row.querySelector("[data-sponsor-name]");
+      const previewWrap = row.querySelector("[data-preview-wrap]");
+      const previewImg = row.querySelector("[data-preview-img]");
+      const removeBtn = row.querySelector("[data-remove-sponsor]");
+
+      if (existing?.logo) {
+        row.dataset.logo = existing.logo;
+        previewImg.src = existing.logo;
+        previewWrap.classList.remove("hidden");
+        nameInput.value = existing.name || "";
+      }
+
+      fileInput.addEventListener("change", async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        try {
+          const logo = await resizeLogoFile(file);
+          row.dataset.logo = logo;
+          previewImg.src = logo;
+          previewWrap.classList.remove("hidden");
+          setupMessage.textContent = "";
+          updateSetupPreview();
+        } catch (_err) {
+          setupMessage.textContent = "Could not use that image. Try PNG or JPG.";
+        }
+      });
+
+      nameInput.addEventListener("input", updateSetupPreview);
+      removeBtn.addEventListener("click", () => {
+        row.remove();
+        updateSetupPreview();
+      });
+
+      sponsorUploadList.appendChild(row);
+    }
+
+    function collectSponsorsFromForm() {
+      const sponsors = [];
+      sponsorUploadList.querySelectorAll(".sponsor-upload-row").forEach((row, index) => {
+        const logo = row.dataset.logo || "";
+        if (!logo) return;
+        const nameInput = row.querySelector("[data-sponsor-name]");
+        sponsors.push({
+          name: nameInput?.value.trim() || `Sponsor ${index + 1}`,
+          logo
+        });
+      });
+      return sponsors;
+    }
+
+    function showSetupView() {
+      setupView.classList.remove("hidden");
+      lobbyView.classList.add("hidden");
+      gameView.classList.add("hidden");
+    }
+
+    function showLobbyView() {
+      setupView.classList.add("hidden");
+      lobbyView.classList.remove("hidden");
+      gameView.classList.add("hidden");
+    }
+
+    function showGameView() {
+      setupView.classList.add("hidden");
+      lobbyView.classList.add("hidden");
+      gameView.classList.remove("hidden");
+    }
+
+    function setJoinLink(url) {
+      primaryJoinUrl = url;
+      playerJoinUrl.textContent = url;
+      qrImage.src = `/api/qr?url=${encodeURIComponent(url)}`;
+    }
+
+    addSponsorBtn.addEventListener("click", () => addSponsorUploadRow());
+    eventTitleInput.addEventListener("input", updateSetupPreview);
+
+    editEventBtn.addEventListener("click", () => {
+      sponsorUploadList.innerHTML = "";
+      (currentEventBranding.sponsors || []).forEach((sponsor) => addSponsorUploadRow(sponsor));
+      if (!sponsorUploadList.children.length) {
+        addSponsorUploadRow();
+        addSponsorUploadRow();
+      }
+      showSetupView();
+      updateSetupPreview();
+    });
+
+    continueToLobbyBtn.addEventListener("click", async () => {
+      const title = eventTitleInput.value.trim();
+      if (!title) {
+        setupMessage.textContent = "Please enter an event title.";
+        return;
+      }
+      continueToLobbyBtn.disabled = true;
+      setupMessage.textContent = "Saving…";
+      try {
+        const res = await fetch("/api/event-branding", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, sponsors: collectSponsorsFromForm() })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setupMessage.textContent = data.error || "Could not save event details.";
+          continueToLobbyBtn.disabled = false;
+          return;
+        }
+        applyEventBranding(data);
+        setupMessage.textContent = "";
+        showLobbyView();
+      } catch (_err) {
+        setupMessage.textContent = "Could not save. Is the server running?";
+      }
+      continueToLobbyBtn.disabled = false;
+    });
+
+    fetch("/api/event-branding")
+      .then((res) => res.json())
+      .then((branding) => {
+        if (branding.title) {
+          applyEventBranding(branding);
+          showLobbyView();
+        } else {
+          addSponsorUploadRow();
+          addSponsorUploadRow();
+          updateSetupPreview();
+          showSetupView();
+        }
+      })
+      .catch(() => {
+        addSponsorUploadRow();
+        addSponsorUploadRow();
+        showSetupView();
+      });
+
+    fetch("/api/join-info")
+      .then((res) => res.json())
+      .then((info) => {
+        const url = info.primaryPlayerUrl
+          || (info.playerUrls && info.playerUrls[0])
+          || `${window.location.protocol}//${window.location.hostname}:${info.port || 3001}/mobile`;
+        setJoinLink(url);
+      })
+      .catch(() => {
+        playerJoinUrl.textContent = "Restart the server (npm start) and refresh this page.";
+      });
+
+    function renderLobbyPlayers(leaderboard) {
+      lobbyPlayerList.innerHTML = "";
+      if (!leaderboard || leaderboard.length === 0) {
+        lobbyPlayerList.innerHTML = "<li class='rank-item rank-empty'><div class='leaderboard-empty'>No players yet — waiting for scan…</div></li>";
+        lobbyStatus.textContent = "Waiting for players to scan and join...";
+        startBtn.disabled = true;
+        return;
+      }
+
+      leaderboard.forEach((player, index) => {
+        const li = document.createElement("li");
+        li.className = "rank-item";
+        li.innerHTML = renderLeaderboardItem(player, index);
+        lobbyPlayerList.appendChild(li);
+      });
+
+      const count = leaderboard.length;
+      lobbyStatus.textContent = `${count} player${count === 1 ? "" : "s"} ready. Press Start when everyone has joined.`;
+      startBtn.disabled = false;
+    }
 
     function randomInRange(min, max) {
       return Math.random() * (max - min) + min;
@@ -63,12 +435,9 @@
     function buildNonOverlappingLayout(shapeCount, radius, minSize, maxSize) {
       const tokens = [];
       const margin = 7;
-
-      // Split the circle into angular sectors for homogeneous coverage.
       const sectorCenters = Array.from({ length: shapeCount }, (_, i) => {
         return (i + 0.5) * ((Math.PI * 2) / shapeCount);
       });
-      // Shuffle sectors so distribution stays random each round.
       for (let i = sectorCenters.length - 1; i > 0; i -= 1) {
         const j = Math.floor(Math.random() * (i + 1));
         [sectorCenters[i], sectorCenters[j]] = [sectorCenters[j], sectorCenters[i]];
@@ -81,9 +450,7 @@
         let placed = null;
 
         for (let attempt = 0; attempt < 120; attempt += 1) {
-          // Keep each item mostly inside its sector, but with random disturbance.
           const angle = sectorBase + randomInRange(-0.23, 0.23);
-          // Radius distribution favors middle ring for balanced fill.
           const radialUnit = randomInRange(0.2, 0.95);
           const distanceFromCenter = radialUnit * (radius - tokenRadius - 10);
           const point = {
@@ -92,7 +459,6 @@
             r: tokenRadius,
             size: tokenSize
           };
-
           const noCollision = tokens.every((t) => distance(t, point) >= (t.r + point.r + margin));
           if (noCollision) {
             placed = point;
@@ -100,7 +466,6 @@
           }
         }
 
-        // Safe fallback (very rare): shrink and place with broader search.
         if (!placed) {
           const fallbackRadius = tokenRadius * 0.82;
           for (let attempt = 0; attempt < 160; attempt += 1) {
@@ -133,7 +498,6 @@
         const slot = layout[index];
         if (!slot) return;
         const item = document.createElement("div");
-
         item.className = "shape";
         item.style.left = `${slot.x}px`;
         item.style.top = `${slot.y}px`;
@@ -155,54 +519,138 @@
     function renderRanking(leaderboard) {
       rankingList.innerHTML = "";
       if (!leaderboard || leaderboard.length === 0) {
-        rankingList.innerHTML = "<li class='rank-item'><span>No players yet</span><span>0</span></li>";
+        rankingList.innerHTML = "<li class='rank-item rank-empty'><div class='leaderboard-empty'>No players on board yet</div></li>";
         return;
       }
       leaderboard.forEach((player, index) => {
         const li = document.createElement("li");
         li.className = "rank-item";
-        if (index === 0) li.classList.add("rank-first");
-        if (index === 1) li.classList.add("rank-second");
-        if (index === 2) li.classList.add("rank-third");
-        const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "•";
-        li.innerHTML = `<span>${medal} ${player.name}</span><strong>${player.score}</strong>`;
+        li.innerHTML = renderLeaderboardItem(player, index);
         rankingList.appendChild(li);
       });
     }
 
-    socket.on("gameState", (state) => {
-      renderRanking(state.leaderboard);
-      startBtn.disabled = state.started && !state.ended;
-
-      if (!state.started && !state.ended) {
-        statusText.textContent = "Waiting to start...";
-      } else if (state.ended) {
-        statusText.textContent = "Game ended.";
-      } else {
-        statusText.textContent = `Round ${state.roundNumber} / ${state.totalRounds}`;
-      }
-
-      renderShapes(leftCircle, state.currentRound ? state.currentRound.leftShapes : []);
-      renderShapes(rightCircle, state.currentRound ? state.currentRound.rightShapes : []);
+    socket.on("eventBranding", (branding) => {
+      applyEventBranding(branding);
     });
 
+    socket.on("gameState", (state) => {
+      latestLeaderboard = state.leaderboard || [];
+      if (state.eventBranding) applyEventBranding(state.eventBranding);
+
+      if (state.started && !state.ended) {
+        showGameView();
+        renderRanking(state.leaderboard);
+        statusText.textContent = `Round ${state.roundNumber} / ${state.totalRounds}`;
+        renderShapes(leftCircle, state.currentRound ? state.currentRound.leftShapes : []);
+        renderShapes(rightCircle, state.currentRound ? state.currentRound.rightShapes : []);
+        return;
+      }
+
+      showLobbyView();
+      renderLobbyPlayers(state.leaderboard);
+
+      if (state.ended) {
+        lobbyStatus.textContent = "Game finished. Players can stay connected — press Start for a new game.";
+        startBtn.disabled = !(state.leaderboard && state.leaderboard.length);
+      }
+    });
+
+    const roundWinnerOverlay = document.getElementById("roundWinnerOverlay");
+    const roundWinnerPhoto = document.getElementById("roundWinnerPhoto");
+    const roundWinnerPhotoFallback = document.getElementById("roundWinnerPhotoFallback");
+    const roundWinnerFlag = document.getElementById("roundWinnerFlag");
+    const roundWinnerName = document.getElementById("roundWinnerName");
+    const roundWinnerRound = document.getElementById("roundWinnerRound");
+    let roundWinnerHideTimer = null;
+
+    document.body.appendChild(roundWinnerOverlay);
+
+    function resolveWinner(data) {
+      const incoming = data.winner || {};
+      const fromBoard = latestLeaderboard.find((p) => p.id === incoming.id)
+        || latestLeaderboard.find((p) => p.name === incoming.name);
+      return { ...fromBoard, ...incoming };
+    }
+
+    function setWinnerPhoto(photoUrl) {
+      const url = String(photoUrl || "");
+      roundWinnerPhoto.onload = () => {
+        roundWinnerPhoto.classList.remove("hidden");
+        roundWinnerPhotoFallback.classList.add("hidden");
+      };
+      roundWinnerPhoto.onerror = () => {
+        roundWinnerPhoto.classList.add("hidden");
+        roundWinnerPhotoFallback.classList.remove("hidden");
+      };
+      if (url) {
+        roundWinnerPhoto.src = url;
+        if (roundWinnerPhoto.complete && roundWinnerPhoto.naturalWidth > 0) {
+          roundWinnerPhoto.classList.remove("hidden");
+          roundWinnerPhotoFallback.classList.add("hidden");
+        }
+      } else {
+        roundWinnerPhoto.removeAttribute("src");
+        roundWinnerPhoto.classList.add("hidden");
+        roundWinnerPhotoFallback.classList.remove("hidden");
+      }
+    }
+
+    function hideRoundWinnerOverlay() {
+      roundWinnerOverlay.classList.remove("show");
+      roundWinnerOverlay.setAttribute("aria-hidden", "true");
+    }
+
+    function showRoundWinnerOverlay(data) {
+      const winner = resolveWinner(data);
+      const name = winner.name || "Winner";
+
+      roundWinnerName.textContent = name;
+      roundWinnerPhoto.alt = `${name} wins the round`;
+      setWinnerPhoto(winner.photo);
+
+      if (winner.countryCode) {
+        roundWinnerFlag.src = countryFlagUrl(winner.countryCode);
+        roundWinnerFlag.alt = winner.countryName || winner.countryCode;
+        roundWinnerFlag.hidden = false;
+      } else {
+        roundWinnerFlag.hidden = true;
+      }
+
+      roundWinnerRound.textContent = `Round ${data.roundNumber} of ${data.totalRounds || 20}`;
+
+      if (roundWinnerHideTimer) clearTimeout(roundWinnerHideTimer);
+
+      roundWinnerOverlay.setAttribute("aria-hidden", "false");
+      roundWinnerOverlay.classList.add("show");
+
+      roundWinnerHideTimer = setTimeout(hideRoundWinnerOverlay, 4000);
+    }
+
     socket.on("roundWinner", (data) => {
-      statusText.textContent = `Round ${data.roundNumber}: ${data.winner.name} found the match first`;
-      bodyEl.classList.add("winner-flash");
-      setTimeout(() => bodyEl.classList.remove("winner-flash"), 700);
+      if (!data || !data.winner) return;
+      statusText.textContent = `Round ${data.roundNumber} · ${data.winner.name} wins!`;
+      showRoundWinnerOverlay(data);
     });
 
     socket.on("gameOver", (data) => {
+      showLobbyView();
       if (!data.leaderboard.length) {
-        statusText.textContent = "Game over. No players joined.";
+        lobbyStatus.textContent = "Game over. No players joined.";
+        startBtn.disabled = true;
         return;
       }
-      statusText.textContent = `Game over. Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score})`;
+      lobbyStatus.textContent = `Game over. Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score}). Press Start for a rematch.`;
+      renderLobbyPlayers(data.leaderboard);
+      startBtn.disabled = false;
     });
 
     startBtn.addEventListener("click", () => {
+      showGameView();
       socket.emit("hostStartGame");
     });
+
+    startBtn.disabled = true;
   </script>
 </body>
 </html>
