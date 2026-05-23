@@ -386,11 +386,7 @@
       }
 
       const sample = shuffleList(urls).slice(0, Math.min(10, urls.length));
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          renderShapes(editPreviewCircle, sample);
-        });
-      });
+      scheduleRenderShapes(editPreviewCircle, sample);
       renderEditShapesGrid();
     }
 
@@ -992,11 +988,35 @@
       return circleEl.querySelector(".circle-shapes-layer");
     }
 
+    let lastGameCircleShapes = { left: [], right: [] };
+
+    function scheduleRenderShapes(circleEl, shapes, attempt = 0) {
+      if (!circleEl) return;
+      const size = Math.min(circleEl.clientWidth, circleEl.clientHeight);
+      if (size < 16) {
+        if (attempt < 40) {
+          requestAnimationFrame(() => scheduleRenderShapes(circleEl, shapes, attempt + 1));
+        }
+        return;
+      }
+      renderShapes(circleEl, shapes);
+    }
+
+    function scheduleRenderGameCircles(leftShapes, rightShapes) {
+      lastGameCircleShapes = {
+        left: leftShapes || [],
+        right: rightShapes || []
+      };
+      scheduleRenderShapes(leftCircle, lastGameCircleShapes.left);
+      scheduleRenderShapes(rightCircle, lastGameCircleShapes.right);
+    }
+
     function renderShapes(circleEl, shapes) {
       const container = getShapesLayer(circleEl);
       if (!container) return;
       container.innerHTML = "";
       const size = Math.min(circleEl.clientWidth, circleEl.clientHeight);
+      if (size < 16) return;
       const radius = size / 2;
       const minSize = size * 0.12;
       const maxSize = size * 0.2;
@@ -1048,8 +1068,8 @@
         showGameView();
         renderRanking(state.leaderboard);
         statusText.textContent = `Round ${state.roundNumber} / ${state.totalRounds}`;
-        renderShapes(leftCircle, state.currentRound ? state.currentRound.leftShapes : []);
-        renderShapes(rightCircle, state.currentRound ? state.currentRound.rightShapes : []);
+        const round = state.currentRound || {};
+        scheduleRenderGameCircles(round.leftShapes, round.rightShapes);
         return;
       }
 
@@ -1151,6 +1171,12 @@
       lobbyStatus.textContent = `Game over. Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score}). Press Start for a rematch.`;
       renderLobbyPlayers(data.leaderboard);
       startBtn.disabled = false;
+    });
+
+    window.addEventListener("resize", () => {
+      if (gameView.classList.contains("hidden")) return;
+      if (!lastGameCircleShapes.left.length && !lastGameCircleShapes.right.length) return;
+      scheduleRenderGameCircles(lastGameCircleShapes.left, lastGameCircleShapes.right);
     });
 
     startBtn.addEventListener("click", () => {
