@@ -281,6 +281,11 @@ button:disabled {
   inset: 0;
   z-index: 2;
   pointer-events: none;
+  overflow: visible;
+}
+
+.circle .shape {
+  z-index: 1;
 }
 
 .host-game {
@@ -292,6 +297,13 @@ button:disabled {
 .host-game .layout {
   flex: 1;
   align-content: start;
+}
+
+.host-game .circle {
+  aspect-ratio: 1;
+  min-width: 240px;
+  min-height: 240px;
+  flex-shrink: 0;
 }
 
 @keyframes slowPulse {

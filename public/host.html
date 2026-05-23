@@ -752,6 +752,13 @@
       setupView.classList.add("hidden");
       lobbyView.classList.add("hidden");
       gameView.classList.remove("hidden");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (lastGameCircleShapes.left.length || lastGameCircleShapes.right.length) {
+            scheduleRenderGameCircles(lastGameCircleShapes.left, lastGameCircleShapes.right);
+          }
+        });
+      });
     }
 
     function setJoinLink(url) {
@@ -989,17 +996,68 @@
     }
 
     let lastGameCircleShapes = { left: [], right: [] };
+    const circleRenderObservers = new Map();
+
+    function getCircleRenderSize(circleEl) {
+      const layer = getShapesLayer(circleEl);
+      if (!layer) return 0;
+
+      const layerRect = layer.getBoundingClientRect();
+      let size = Math.min(layerRect.width, layerRect.height);
+      if (size >= 16) return size;
+
+      const circleRect = circleEl.getBoundingClientRect();
+      size = Math.min(circleRect.width, circleRect.height);
+      if (size >= 16) return size;
+
+      const style = window.getComputedStyle(circleEl);
+      const w = parseFloat(style.width);
+      const h = parseFloat(style.height);
+      size = Math.min(w || 0, h || 0);
+      if (size >= 16) return size;
+
+      return Math.max(circleEl.clientWidth, circleEl.clientHeight, 0);
+    }
+
+    function ensureShapeLayout(shapeCount, radius, minSize, maxSize) {
+      const layout = buildNonOverlappingLayout(shapeCount, radius, minSize, maxSize);
+      const tokenSize = (minSize + maxSize) / 2;
+      for (let i = layout.length; i < shapeCount; i += 1) {
+        const angle = (i / shapeCount) * Math.PI * 2 - Math.PI / 2;
+        const dist = radius * (0.38 + (i % 4) * 0.08);
+        layout.push({
+          x: radius + Math.cos(angle) * dist,
+          y: radius + Math.sin(angle) * dist,
+          r: tokenSize / 2,
+          size: tokenSize
+        });
+      }
+      return layout;
+    }
+
+    function attachCircleRenderObserver(circleEl) {
+      if (!circleEl || circleRenderObservers.has(circleEl)) return;
+      const observer = new ResizeObserver(() => {
+        const pending = circleEl._pendingShapes;
+        if (!pending?.length) return;
+        const size = getCircleRenderSize(circleEl);
+        if (size >= 16) renderShapes(circleEl, pending, size);
+      });
+      observer.observe(circleEl);
+      circleRenderObservers.set(circleEl, observer);
+    }
 
     function scheduleRenderShapes(circleEl, shapes, attempt = 0) {
       if (!circleEl) return;
-      const size = Math.min(circleEl.clientWidth, circleEl.clientHeight);
-      if (size < 16) {
-        if (attempt < 40) {
-          requestAnimationFrame(() => scheduleRenderShapes(circleEl, shapes, attempt + 1));
-        }
+      circleEl._pendingShapes = shapes || [];
+      const size = getCircleRenderSize(circleEl);
+      if (size >= 16 && circleEl._pendingShapes.length) {
+        renderShapes(circleEl, circleEl._pendingShapes, size);
         return;
       }
-      renderShapes(circleEl, shapes);
+      if (attempt < 80) {
+        requestAnimationFrame(() => scheduleRenderShapes(circleEl, shapes, attempt + 1));
+      }
     }
 
     function scheduleRenderGameCircles(leftShapes, rightShapes) {
@@ -1011,18 +1069,25 @@
       scheduleRenderShapes(rightCircle, lastGameCircleShapes.right);
     }
 
-    function renderShapes(circleEl, shapes) {
+    function renderShapes(circleEl, shapes, knownSize) {
       const container = getShapesLayer(circleEl);
       if (!container) return;
-      container.innerHTML = "";
-      const size = Math.min(circleEl.clientWidth, circleEl.clientHeight);
+      const list = shapes || [];
+      if (!list.length) {
+        container.innerHTML = "";
+        return;
+      }
+
+      const size = knownSize || getCircleRenderSize(circleEl);
       if (size < 16) return;
+
+      container.innerHTML = "";
       const radius = size / 2;
       const minSize = size * 0.12;
       const maxSize = size * 0.2;
-      const layout = buildNonOverlappingLayout((shapes || []).length, radius, minSize, maxSize);
+      const layout = ensureShapeLayout(list.length, radius, minSize, maxSize);
 
-      (shapes || []).forEach((shape, index) => {
+      list.forEach((shape, index) => {
         const slot = layout[index];
         if (!slot) return;
         const item = document.createElement("div");
@@ -1151,7 +1216,10 @@
       roundWinnerOverlay.classList.add("show");
       playRoundWinSound();
 
-      roundWinnerHideTimer = setTimeout(hideRoundWinnerOverlay, 4000);
+      roundWinnerHideTimer = setTimeout(() => {
+        hideRoundWinnerOverlay();
+        scheduleRenderGameCircles(lastGameCircleShapes.left, lastGameCircleShapes.right);
+      }, 4000);
     }
 
     socket.on("roundWinner", (data) => {
@@ -1178,6 +1246,10 @@
       if (!lastGameCircleShapes.left.length && !lastGameCircleShapes.right.length) return;
       scheduleRenderGameCircles(lastGameCircleShapes.left, lastGameCircleShapes.right);
     });
+
+    attachCircleRenderObserver(leftCircle);
+    attachCircleRenderObserver(rightCircle);
+    attachCircleRenderObserver(editPreviewCircle);
 
     startBtn.addEventListener("click", () => {
       primeGameAudio();
