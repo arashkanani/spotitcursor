@@ -1,0 +1,21 @@
+# Render Blueprint — Shape Match Game
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: spotitcursor
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: spotitcursor-data
+      mountPath: /var/data
+      sizeGB: 1

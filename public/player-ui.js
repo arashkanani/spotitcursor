@@ -1,3 +1,63 @@
+let gameAudioContext = null;
+
+function getGameAudioContext() {
+  if (!gameAudioContext) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    gameAudioContext = new AudioCtx();
+  }
+  return gameAudioContext;
+}
+
+function primeGameAudio() {
+  const ctx = getGameAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume();
+}
+
+function playRoundWinSound() {
+  try {
+    const ctx = getGameAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") void ctx.resume();
+
+    const now = ctx.currentTime;
+    const melody = [
+      { freq: 523.25, at: 0, dur: 0.14 },
+      { freq: 659.25, at: 0.11, dur: 0.14 },
+      { freq: 783.99, at: 0.22, dur: 0.14 },
+      { freq: 1046.5, at: 0.33, dur: 0.42 }
+    ];
+    const chord = [523.25, 659.25, 783.99];
+
+    function tone(freq, start, duration, volume, type) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || "triangle";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(volume, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + duration + 0.05);
+    }
+
+    for (const note of melody) {
+      tone(note.freq, now + note.at, note.dur, 0.2, "triangle");
+      tone(note.freq * 2, now + note.at, note.dur * 0.55, 0.06, "sine");
+    }
+
+    const chordStart = now + 0.48;
+    for (const freq of chord) {
+      tone(freq, chordStart, 0.55, 0.1, "sine");
+    }
+  } catch (_err) {
+    // Ignore if audio is blocked or unavailable.
+  }
+}
+
 function countryFlagUrl(code) {
   if (!code || String(code).length !== 2) return "";
   return `/flags/${String(code).toLowerCase()}.svg`;

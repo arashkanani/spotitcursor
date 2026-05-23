@@ -1,23 +1,26 @@
 {
-  "name": "test-cursor",
+  "name": "spotitcursor",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Live multiplayer shape match game — host screen + mobile players",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
     "test": "echo \"No tests configured\""
   },
+  "engines": {
+    "node": ">=20"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "description": "",
   "dependencies": {
-    "cors": "^2.8.5",
+    "compression": "^1.8.0",
     "express": "^5.1.0",
     "flag-icons": "^7.5.0",
+    "multer": "^2.1.1",
     "qrcode": "^1.5.4",
-    "socket.io": "^4.8.3",
-    "sqlite3": "^5.1.7"
+    "socket.io": "^4.8.3"
   }
 }

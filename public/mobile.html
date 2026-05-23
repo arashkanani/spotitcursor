@@ -36,13 +36,14 @@
       </div>
 
       <button id="joinBtn" disabled>Join as Player</button>
-      <p class="status" id="joinMessage">Scan the QR on the host screen, then fill in your details.</p>
+      <p class="status" id="joinMessage">Open the link from the host screen or scan the QR code, then fill in your details.</p>
     </div>
 
     <div class="mobile-wrap hidden" id="gameCard">
       <div class="card">
         <div id="playerHeader" class="player-header"></div>
         <p class="status" id="mobileStatus">Waiting for host to start the game...</p>
+        <p id="triesLeft" class="tries-left" aria-live="polite">3 tries this round</p>
       </div>
 
       <div class="card" style="margin-top:1rem;">
@@ -69,12 +70,17 @@
     const joinMessage = document.getElementById("joinMessage");
     const playerHeader = document.getElementById("playerHeader");
     const mobileStatus = document.getElementById("mobileStatus");
+    const triesLeft = document.getElementById("triesLeft");
     const shapeGrid = document.getElementById("shapeGrid");
 
+    const MISTAKES_PER_ROUND = 3;
     let joined = false;
     let myProfile = null;
     let canPick = false;
-    let shapePool = [];
+    let canPickThisRound = true;
+    let mistakesThisRound = 0;
+    let lastRoundNumber = 0;
+    let lastMobileShapesKey = "";
     let photoDataUrl = "";
     let allCountries = [];
     let selectedCountryCode = "";
@@ -199,6 +205,26 @@
       }
     });
 
+    function updateTriesDisplay() {
+      if (!triesLeft) return;
+      const remaining = Math.max(0, MISTAKES_PER_ROUND - mistakesThisRound);
+      if (!canPickThisRound && mistakesThisRound >= MISTAKES_PER_ROUND) {
+        triesLeft.textContent = "No tries left — wait for next round";
+        triesLeft.classList.add("is-empty");
+      } else {
+        triesLeft.textContent = `${remaining} mistake${remaining === 1 ? "" : "s"} allowed this round`;
+        triesLeft.classList.remove("is-empty");
+      }
+    }
+
+    function resetRoundTries(roundNumber) {
+      if (roundNumber === lastRoundNumber) return;
+      lastRoundNumber = roundNumber;
+      mistakesThisRound = 0;
+      canPickThisRound = true;
+      updateTriesDisplay();
+    }
+
     function renderShapeButtons(shapes) {
       shapeGrid.innerHTML = "";
       (shapes || []).forEach((shape) => {
@@ -221,6 +247,7 @@
     }
 
     joinBtn.addEventListener("click", () => {
+      primeGameAudio();
       const name = nameInput.value.trim();
       if (!name) {
         joinMessage.textContent = "Please enter your name.";
@@ -264,18 +291,38 @@
       mobileStatus.textContent = "Joined. Waiting for host to start...";
     });
 
+    socket.on("pickResult", (data) => {
+      if (!joined || data.correct) return;
+      mistakesThisRound = data.mistakesUsed || mistakesThisRound;
+      if (data.outOfChances) {
+        canPickThisRound = false;
+        mobileStatus.textContent = "Wrong 3 times — wait for the next round.";
+      } else {
+        mobileStatus.textContent = `Wrong shape! ${data.mistakesRemaining} try${data.mistakesRemaining === 1 ? "" : "ies"} left.`;
+      }
+      updateTriesDisplay();
+    });
+
     socket.on("gameState", (state) => {
-      if (Array.isArray(state.shapePool) && state.shapePool.length) {
-        const needsRebuild = shapePool.length !== state.shapePool.length
-          || shapePool.some((v, i) => v !== state.shapePool[i]);
-        if (needsRebuild) {
-          shapePool = [...state.shapePool];
-          renderShapeButtons(shapePool);
-        }
+      if (!joined) return;
+
+      if (state.started && !state.ended) {
+        resetRoundTries(state.roundNumber || 0);
       }
 
-      if (!joined) return;
-      canPick = state.started && !state.ended;
+      const mobileShapes = Array.isArray(state.mobileShapes) ? state.mobileShapes : [];
+      if (state.started && !state.ended && mobileShapes.length) {
+        const shapesKey = mobileShapes.join("\0");
+        if (shapesKey !== lastMobileShapesKey) {
+          lastMobileShapesKey = shapesKey;
+          renderShapeButtons(mobileShapes);
+        }
+      } else if (!state.started || state.ended) {
+        lastMobileShapesKey = "";
+        shapeGrid.innerHTML = "";
+      }
+
+      canPick = state.started && !state.ended && canPickThisRound;
 
       const me = (state.leaderboard || []).find((p) => p.id === myProfile?.id || p.name === myProfile?.name);
       if (me) {
@@ -287,15 +334,18 @@
         mobileStatus.textContent = "Waiting for host to start...";
       } else if (state.ended) {
         mobileStatus.textContent = `Game ended. Your score: ${me ? me.score : 0}`;
-      } else {
-        mobileStatus.textContent = `Round ${state.roundNumber} / ${state.totalRounds} - pick now`;
+      } else if (canPickThisRound) {
+        mobileStatus.textContent = `Round ${state.roundNumber} / ${state.totalRounds} — pick the matching shape`;
       }
+      updateTriesDisplay();
     });
 
     socket.on("roundWinner", (data) => {
       if (!joined) return;
       canPick = false;
+      canPickThisRound = false;
       mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}.`;
+      playRoundWinSound();
     });
 
     socket.on("gameOver", (data) => {

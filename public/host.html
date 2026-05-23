@@ -20,28 +20,92 @@
   <div class="page">
     <section id="setupView" class="host-setup">
       <div class="setup-card card">
-        <div class="setup-intro">
-          <p class="event-eyebrow">Step 1</p>
-          <h2 class="setup-title">Event branding</h2>
-          <p class="setup-subtitle">Set your event title and sponsor logos. They appear on every game screen.</p>
+        <div id="sponsorLibraryPanel">
+          <div class="setup-intro">
+            <p class="event-eyebrow">Step 1 · Pick your sponsor</p>
+            <h2 class="setup-title">Choose a sponsor &amp; edit circle shapes</h2>
+            <p class="setup-subtitle">Select who sponsors this game, then open <strong>Edit shapes</strong> to add or remove the PNG icons that appear inside the two circles.</p>
+          </div>
+
+          <div class="setup-section">
+            <div class="setup-section-head">
+              <h3 class="setup-section-title">Existing sponsors</h3>
+              <button type="button" id="newSponsorBtn" class="ghost-btn">+ New sponsor</button>
+            </div>
+            <div id="sponsorGrid" class="sponsor-grid" aria-live="polite"></div>
+            <p class="setup-hint" id="sponsorGridHint">Loading…</p>
+          </div>
+
+          <div id="chosenSponsorBar" class="chosen-sponsor-bar hidden">
+            <div class="chosen-sponsor-main">
+              <p class="chosen-sponsor-label">Selected for this game</p>
+              <h3 id="chosenSponsorName" class="chosen-sponsor-name">—</h3>
+              <p id="chosenSponsorStatus" class="chosen-sponsor-status"></p>
+            </div>
+            <div class="chosen-sponsor-actions">
+              <button type="button" id="editChosenShapesBtn" class="start-game-btn">Edit circle shapes</button>
+              <button type="button" id="changeSponsorBtn" class="ghost-btn">Change sponsor</button>
+            </div>
+          </div>
         </div>
 
-        <label class="field-label" for="eventTitleInput">Event title</label>
-        <input id="eventTitleInput" type="text" placeholder="e.g. Gulf Innovation Championship 2026" maxlength="80">
+        <div id="sponsorEditPanel" class="sponsor-edit-panel hidden">
+          <div class="edit-mode-header">
+            <button type="button" id="editBackBtn" class="ghost-btn">← All packs</button>
+            <div>
+              <p class="event-eyebrow">Edit mode</p>
+              <h3 class="setup-section-title" id="editModeTitle">Circle shapes</h3>
+              <p class="setup-hint" id="editModeHint">These PNGs are what players match — shown inside the circles on screen.</p>
+            </div>
+          </div>
 
-        <div class="setup-sponsors-head">
-          <label class="field-label">Sponsor logos</label>
-          <button type="button" id="addSponsorBtn" class="btn-secondary">+ Add sponsor</button>
+          <div id="editIncompleteBanner" class="edit-incomplete-banner hidden" role="status">
+            <strong>Not enough shapes for a game.</strong>
+            <span id="editIncompleteText"></span>
+            <span class="edit-incomplete-actions">Add PNGs below or delete ones you don’t want.</span>
+          </div>
+
+          <div id="editCreateNameRow" class="edit-create-name-row hidden">
+            <label class="field-label" for="editSponsorNameInput">Sponsor name</label>
+            <input id="editSponsorNameInput" type="text" placeholder="e.g. IKEA" maxlength="60">
+          </div>
+
+          <div class="edit-circle-preview-block">
+            <p class="edit-preview-label">Game circle preview (live layout)</p>
+            <div class="circle edit-preview-circle" id="editPreviewCircle">
+              <div class="circle-shapes-layer"></div>
+            </div>
+          </div>
+
+          <div class="setup-section">
+            <div class="setup-section-head">
+              <h3 class="setup-section-title">Shape gallery</h3>
+              <span id="editShapeCount" class="edit-shape-count">0 shapes</span>
+            </div>
+            <div id="editShapesGrid" class="edit-shapes-grid" aria-live="polite"></div>
+            <p class="setup-hint" id="editShapesHint">Tap <strong>×</strong> on any shape to delete it. Upload PNGs to add more. (Minimum <span id="editMinShapes">19</span> shapes.)</p>
+          </div>
+
+          <div class="edit-upload-row">
+            <label class="field-label" for="editShapesInput">Add shapes (PNG)</label>
+            <input id="editShapesInput" type="file" accept="image/png" multiple>
+            <button type="button" id="editUploadBtn" class="start-game-btn hidden">Upload selected shapes</button>
+            <button type="button" id="editSaveNewPackBtn" class="start-game-btn hidden">Save new pack</button>
+          </div>
         </div>
-        <div id="sponsorUploadList" class="sponsor-upload-list"></div>
+
+        <div class="setup-section setup-section-event">
+          <label class="field-label" for="eventTitleInput">Event title</label>
+          <input id="eventTitleInput" type="text" placeholder="e.g. Gulf Innovation Championship 2026" maxlength="80">
+        </div>
 
         <p class="setup-preview-label">Live preview</p>
         <header class="event-branding-bar setup-preview-bar">
           <div class="event-branding-main">
-            <p class="event-eyebrow">Presented by</p>
+            <p class="event-eyebrow">Live Event</p>
             <h2 class="event-title" data-event-title>Your Event Title</h2>
+            <p class="event-sponsor-line" data-event-sponsor hidden></p>
           </div>
-          <div class="sponsor-strip" data-sponsor-strip></div>
         </header>
 
         <p class="status" id="setupMessage"></p>
@@ -54,9 +118,9 @@
         <div class="event-branding-main">
           <p class="event-eyebrow">Live Event</p>
           <h2 class="event-title" data-event-title>Shape Match</h2>
+          <p class="event-sponsor-line" data-event-sponsor hidden></p>
         </div>
-        <div class="sponsor-strip" data-sponsor-strip></div>
-        <button type="button" id="editEventBtn" class="edit-event-btn" title="Edit event branding">Edit</button>
+        <button type="button" id="editEventBtn" class="edit-event-btn" title="Edit event & sponsor">Edit</button>
       </header>
       <p class="lobby-subtitle">Players scan the QR code, register, then you start the game.</p>
 
@@ -67,7 +131,7 @@
             <img id="qrImage" class="qr-image" alt="QR code to join the game" width="320" height="320">
           </div>
           <p class="join-url" id="playerJoinUrl">Loading join link...</p>
-          <p class="join-hint">Phone must be on the same Wi‑Fi as this PC (not mobile data only).</p>
+          <p class="join-hint" id="joinHint">Phone must be on the same Wi‑Fi as this PC (not mobile data only).</p>
         </div>
 
         <div class="card lobby-players-card leaderboard-panel">
@@ -87,16 +151,20 @@
         <div class="event-branding-main">
           <p class="event-eyebrow">Live Event</p>
           <h2 class="event-title" data-event-title>Shape Match</h2>
+          <p class="event-sponsor-line" data-event-sponsor hidden></p>
         </div>
-        <div class="sponsor-strip" data-sponsor-strip></div>
         <div class="round-pill" id="statusText">Round 1 / 20</div>
       </header>
 
       <div class="layout">
         <section class="card game-board-card">
           <div class="circles">
-            <div class="circle" id="leftCircle"></div>
-            <div class="circle" id="rightCircle"></div>
+            <div class="circle" id="leftCircle">
+              <div class="circle-shapes-layer"></div>
+            </div>
+            <div class="circle" id="rightCircle">
+              <div class="circle-shapes-layer"></div>
+            </div>
           </div>
         </section>
 
@@ -134,8 +202,31 @@
     const lobbyView = document.getElementById("lobbyView");
     const gameView = document.getElementById("gameView");
     const eventTitleInput = document.getElementById("eventTitleInput");
-    const sponsorUploadList = document.getElementById("sponsorUploadList");
-    const addSponsorBtn = document.getElementById("addSponsorBtn");
+    const sponsorLibraryPanel = document.getElementById("sponsorLibraryPanel");
+    const sponsorEditPanel = document.getElementById("sponsorEditPanel");
+    const sponsorGrid = document.getElementById("sponsorGrid");
+    const sponsorGridHint = document.getElementById("sponsorGridHint");
+    const chosenSponsorBar = document.getElementById("chosenSponsorBar");
+    const chosenSponsorName = document.getElementById("chosenSponsorName");
+    const chosenSponsorStatus = document.getElementById("chosenSponsorStatus");
+    const editChosenShapesBtn = document.getElementById("editChosenShapesBtn");
+    const changeSponsorBtn = document.getElementById("changeSponsorBtn");
+    const newSponsorBtn = document.getElementById("newSponsorBtn");
+    const editBackBtn = document.getElementById("editBackBtn");
+    const editModeTitle = document.getElementById("editModeTitle");
+    const editModeHint = document.getElementById("editModeHint");
+    const editIncompleteBanner = document.getElementById("editIncompleteBanner");
+    const editIncompleteText = document.getElementById("editIncompleteText");
+    const editCreateNameRow = document.getElementById("editCreateNameRow");
+    const editSponsorNameInput = document.getElementById("editSponsorNameInput");
+    const editPreviewCircle = document.getElementById("editPreviewCircle");
+    const editShapesGrid = document.getElementById("editShapesGrid");
+    const editShapeCount = document.getElementById("editShapeCount");
+    const editShapesHint = document.getElementById("editShapesHint");
+    const editMinShapes = document.getElementById("editMinShapes");
+    const editShapesInput = document.getElementById("editShapesInput");
+    const editUploadBtn = document.getElementById("editUploadBtn");
+    const editSaveNewPackBtn = document.getElementById("editSaveNewPackBtn");
     const continueToLobbyBtn = document.getElementById("continueToLobbyBtn");
     const setupMessage = document.getElementById("setupMessage");
     const editEventBtn = document.getElementById("editEventBtn");
@@ -152,149 +243,465 @@
 
     let primaryJoinUrl = "";
     let latestLeaderboard = [];
-    let currentEventBranding = { title: "", sponsors: [] };
-    const MAX_SPONSOR_SLOTS = 8;
-
-    function renderSponsorStrip(container, sponsors) {
-      container.innerHTML = "";
-      if (!sponsors || !sponsors.length) {
-        container.classList.add("is-empty");
-        return;
-      }
-      container.classList.remove("is-empty");
-      sponsors.forEach((sponsor, index) => {
-        const item = document.createElement("div");
-        item.className = "sponsor-logo-item";
-        const safeName = escapeHtml(sponsor.name || `Sponsor ${index + 1}`);
-        item.innerHTML = `<img src="${sponsor.logo}" alt="${safeName}">`;
-        container.appendChild(item);
-      });
-    }
+    let currentEventTitle = "";
+    let selectedSponsorId = null;
+    let sponsorCatalog = [];
+    let minShapesRequired = 19;
+    let editContext = null;
+    let editShapeItems = [];
+    let editBlobUrls = [];
 
     function applyEventBranding(branding) {
-      currentEventBranding = branding || { title: "", sponsors: [] };
-      const title = currentEventBranding.title || "Shape Match";
+      const title = String(branding?.title || "").trim() || "Shape Match";
+      currentEventTitle = title;
       document.querySelectorAll("[data-event-title]").forEach((el) => {
         el.textContent = title;
       });
-      document.querySelectorAll("[data-sponsor-strip]").forEach((el) => {
-        renderSponsorStrip(el, currentEventBranding.sponsors);
-      });
       if (eventTitleInput) {
-        eventTitleInput.value = currentEventBranding.title || "";
+        eventTitleInput.value = branding?.title || "";
       }
-    }
-
-    function updateSetupPreview() {
-      const previewSponsors = [];
-      sponsorUploadList.querySelectorAll(".sponsor-upload-row").forEach((row, index) => {
-        const logo = row.dataset.logo || "";
-        if (!logo) return;
-        const nameInput = row.querySelector("[data-sponsor-name]");
-        previewSponsors.push({
-          name: nameInput?.value.trim() || `Sponsor ${index + 1}`,
-          logo
-        });
-      });
-      applyEventBranding({
-        title: eventTitleInput.value.trim() || "Your Event Title",
-        sponsors: previewSponsors
-      });
-    }
-
-    function resizeLogoFile(file) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        img.onload = () => {
-          const maxSide = 420;
-          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.max(1, Math.round(img.width * scale));
-          canvas.height = Math.max(1, Math.round(img.height * scale));
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          URL.revokeObjectURL(objectUrl);
-          resolve(canvas.toDataURL("image/png", 0.92));
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(objectUrl);
-          reject(new Error("Could not read logo."));
-        };
-        img.src = objectUrl;
-      });
-    }
-
-    function addSponsorUploadRow(existing) {
-      if (sponsorUploadList.children.length >= MAX_SPONSOR_SLOTS) return;
-
-      const row = document.createElement("div");
-      row.className = "sponsor-upload-row";
-      row.innerHTML = `
-        <div class="sponsor-upload-preview-wrap hidden" data-preview-wrap>
-          <img class="sponsor-upload-thumb" data-preview-img alt="">
-        </div>
-        <div class="sponsor-upload-fields">
-          <label class="sponsor-file-label">
-            <input type="file" accept="image/*" data-sponsor-file hidden>
-            Upload logo
-          </label>
-          <input type="text" class="sponsor-name-input" data-sponsor-name placeholder="Sponsor name (optional)" maxlength="48">
-          <button type="button" class="sponsor-remove-btn" data-remove-sponsor>Remove</button>
-        </div>
-      `;
-
-      const fileInput = row.querySelector("[data-sponsor-file]");
-      const nameInput = row.querySelector("[data-sponsor-name]");
-      const previewWrap = row.querySelector("[data-preview-wrap]");
-      const previewImg = row.querySelector("[data-preview-img]");
-      const removeBtn = row.querySelector("[data-remove-sponsor]");
-
-      if (existing?.logo) {
-        row.dataset.logo = existing.logo;
-        previewImg.src = existing.logo;
-        previewWrap.classList.remove("hidden");
-        nameInput.value = existing.name || "";
+      if (branding?.sponsorId) {
+        selectedSponsorId = branding.sponsorId;
       }
-
-      fileInput.addEventListener("change", async () => {
-        const file = fileInput.files && fileInput.files[0];
-        if (!file) return;
-        try {
-          const logo = await resizeLogoFile(file);
-          row.dataset.logo = logo;
-          previewImg.src = logo;
-          previewWrap.classList.remove("hidden");
-          setupMessage.textContent = "";
-          updateSetupPreview();
-        } catch (_err) {
-          setupMessage.textContent = "Could not use that image. Try PNG or JPG.";
+      const sponsorLabel = branding?.sponsorName
+        ? `Shapes by ${branding.sponsorName}`
+        : "";
+      document.querySelectorAll("[data-event-sponsor]").forEach((el) => {
+        if (sponsorLabel) {
+          el.textContent = sponsorLabel;
+          el.hidden = false;
+        } else {
+          el.textContent = "";
+          el.hidden = true;
         }
       });
-
-      nameInput.addEventListener("input", updateSetupPreview);
-      removeBtn.addEventListener("click", () => {
-        row.remove();
-        updateSetupPreview();
-      });
-
-      sponsorUploadList.appendChild(row);
+      renderSponsorGrid();
+      updateChosenSponsorBar();
     }
 
-    function collectSponsorsFromForm() {
-      const sponsors = [];
-      sponsorUploadList.querySelectorAll(".sponsor-upload-row").forEach((row, index) => {
-        const logo = row.dataset.logo || "";
-        if (!logo) return;
-        const nameInput = row.querySelector("[data-sponsor-name]");
-        sponsors.push({
-          name: nameInput?.value.trim() || `Sponsor ${index + 1}`,
-          logo
+    function selectSponsor(sponsorId) {
+      const sponsor = sponsorCatalog.find((s) => s.id === sponsorId);
+      if (!sponsor) return;
+      selectedSponsorId = sponsorId;
+      renderSponsorGrid();
+      updateChosenSponsorBar();
+      document.querySelectorAll("[data-event-sponsor]").forEach((el) => {
+        el.textContent = `Shapes by ${sponsor.name}`;
+        el.hidden = false;
+      });
+    }
+
+    function activateSponsorCard(sponsor) {
+      selectSponsor(sponsor.id);
+      setupMessage.textContent = `Opening ${sponsor.name} — add or delete circle shapes below.`;
+      openSponsorEdit(sponsor.id, sponsor.name);
+    }
+
+    function updateChosenSponsorBar() {
+      if (!chosenSponsorBar) return;
+      const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
+      if (!sponsor) {
+        chosenSponsorBar.classList.add("hidden");
+        return;
+      }
+
+      chosenSponsorBar.classList.remove("hidden");
+      chosenSponsorName.textContent = sponsor.name;
+      if (sponsor.ready) {
+        chosenSponsorStatus.textContent = `${sponsor.shapeCount} circle shapes · Ready to play`;
+        chosenSponsorStatus.classList.remove("is-warning");
+        chosenSponsorStatus.classList.add("is-ready");
+      } else {
+        const need = minShapesRequired - sponsor.shapeCount;
+        chosenSponsorStatus.textContent = `${sponsor.shapeCount} shapes — add ${need} more in edit mode`;
+        chosenSponsorStatus.classList.add("is-warning");
+        chosenSponsorStatus.classList.remove("is-ready");
+      }
+    }
+
+    function showSponsorLibrary() {
+      sponsorLibraryPanel.classList.remove("hidden");
+      sponsorEditPanel.classList.add("hidden");
+      editContext = null;
+      revokeEditBlobs();
+      editShapeItems = [];
+    }
+
+    function showSponsorEditMode() {
+      sponsorLibraryPanel.classList.add("hidden");
+      sponsorEditPanel.classList.remove("hidden");
+    }
+
+    function revokeEditBlobs() {
+      for (const url of editBlobUrls) URL.revokeObjectURL(url);
+      editBlobUrls = [];
+    }
+
+    function shuffleList(items) {
+      const list = [...items];
+      for (let i = list.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+      return list;
+    }
+
+    function refreshEditPreview() {
+      const urls = editShapeItems.map((item) => item.url);
+      const count = urls.length;
+      const ready = count >= minShapesRequired;
+      const needMore = Math.max(0, minShapesRequired - count);
+      editShapeCount.textContent = `${count} shape${count === 1 ? "" : "s"}${ready ? " · Ready for game" : ` · need ${needMore} more`}`;
+      editShapeCount.classList.toggle("is-ready", ready);
+      if (editMinShapes) editMinShapes.textContent = String(minShapesRequired);
+
+      if (editIncompleteBanner) {
+        if (!ready && editContext) {
+          editIncompleteBanner.classList.remove("hidden");
+          editIncompleteText.textContent = ` You have ${count} — add ${needMore} more shape${needMore === 1 ? "" : "s"} to run a game.`;
+        } else {
+          editIncompleteBanner.classList.add("hidden");
+        }
+      }
+
+      const sample = shuffleList(urls).slice(0, Math.min(10, urls.length));
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          renderShapes(editPreviewCircle, sample);
         });
       });
-      return sponsors;
+      renderEditShapesGrid();
+    }
+
+    function renderEditShapesGrid() {
+      editShapesGrid.innerHTML = "";
+      if (!editShapeItems.length) {
+        editShapesHint.textContent = `No shapes yet — choose PNG files below (minimum ${minShapesRequired} for the game).`;
+        return;
+      }
+      editShapesHint.textContent = editContext?.mode === "create"
+        ? "New shapes show with a gold tag. Tap × to remove before saving."
+        : "Tap × on any shape to delete it from this pack. Pick files below to add more.";
+
+      for (const item of editShapeItems) {
+        const cell = document.createElement("div");
+        cell.className = "edit-shape-cell";
+        if (item.pending) cell.classList.add("is-pending");
+
+        const img = document.createElement("img");
+        img.src = item.url;
+        img.alt = "Circle shape";
+        cell.appendChild(img);
+
+        if (item.pending) {
+          const badge = document.createElement("span");
+          badge.className = "edit-shape-badge";
+          badge.textContent = "New";
+          cell.appendChild(badge);
+        }
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "edit-shape-remove";
+        removeBtn.setAttribute("aria-label", "Delete shape");
+        removeBtn.textContent = "×";
+        removeBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          removeEditShape(item);
+        });
+        cell.appendChild(removeBtn);
+
+        editShapesGrid.appendChild(cell);
+      }
+    }
+
+    function removePendingEditShape(item) {
+      if (!item.pending) return;
+      const idx = editBlobUrls.indexOf(item.url);
+      if (idx >= 0) {
+        URL.revokeObjectURL(editBlobUrls[idx]);
+        editBlobUrls.splice(idx, 1);
+      }
+      editShapeItems = editShapeItems.filter((entry) => entry !== item);
+      refreshEditPreview();
+      setupMessage.textContent = "Shape removed from list.";
+    }
+
+    async function removeEditShape(item) {
+      if (item.pending) {
+        removePendingEditShape(item);
+        return;
+      }
+      if (!editContext || editContext.mode !== "edit" || !item.filename) return;
+      if (!window.confirm("Delete this shape from the pack?")) return;
+
+      try {
+        const res = await fetch(
+          `/api/sponsors/${encodeURIComponent(editContext.sponsorId)}/shapes/${encodeURIComponent(item.filename)}`,
+          { method: "DELETE" }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setupMessage.textContent = data.error || "Could not delete shape.";
+          return;
+        }
+        await openSponsorEdit(editContext.sponsorId, editContext.name);
+        await loadSponsorCatalog();
+        updateChosenSponsorBar();
+        setupMessage.textContent = "Shape deleted.";
+      } catch (_err) {
+        setupMessage.textContent = "Could not delete shape.";
+      }
+    }
+
+    function addPendingShapeFiles(fileList) {
+      const files = [...(fileList || [])];
+      if (!files.length) return;
+      for (const file of files) {
+        const blobUrl = URL.createObjectURL(file);
+        editBlobUrls.push(blobUrl);
+        editShapeItems.push({ url: blobUrl, pending: true, file });
+      }
+      refreshEditPreview();
+    }
+
+    async function openSponsorEdit(sponsorId, name) {
+      editContext = { mode: "edit", sponsorId, name };
+      selectedSponsorId = sponsorId;
+      editCreateNameRow.classList.add("hidden");
+      editSaveNewPackBtn.classList.add("hidden");
+      editUploadBtn.classList.remove("hidden");
+      editModeTitle.textContent = `${name} — circle shapes`;
+      showSponsorEditMode();
+
+      try {
+        const res = await fetch(`/api/sponsors/${encodeURIComponent(sponsorId)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        revokeEditBlobs();
+        editShapeItems = (data.shapeEntries || []).map((entry) => ({
+          url: entry.url,
+          filename: entry.filename,
+          pending: false
+        }));
+        refreshEditPreview();
+        renderSponsorGrid();
+      } catch (_err) {
+        setupMessage.textContent = "Could not load shapes for this pack.";
+      }
+    }
+
+    function openCreateSponsorEdit() {
+      editContext = { mode: "create" };
+      selectedSponsorId = null;
+      revokeEditBlobs();
+      editShapeItems = [];
+      editSponsorNameInput.value = "";
+      editCreateNameRow.classList.remove("hidden");
+      editSaveNewPackBtn.classList.remove("hidden");
+      editUploadBtn.classList.add("hidden");
+      editModeTitle.textContent = "New sponsor pack";
+      editShapesInput.value = "";
+      showSponsorEditMode();
+      refreshEditPreview();
+    }
+
+    async function uploadPendingShapes(sponsorId) {
+      const pending = editShapeItems.filter((item) => item.pending && item.file);
+      if (!pending.length) return null;
+
+      const form = new FormData();
+      for (const item of pending) {
+        form.append("shapes", item.file);
+      }
+
+      const res = await fetch(`/api/sponsors/${encodeURIComponent(sponsorId)}/shapes`, {
+        method: "POST",
+        body: form
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      return data;
+    }
+
+    async function loadSponsorCatalog() {
+      const res = await fetch("/api/sponsors");
+      const data = await res.json();
+      sponsorCatalog = data.sponsors || [];
+      minShapesRequired = data.minShapes || 19;
+      if (!selectedSponsorId && data.activeSponsorId) {
+        selectedSponsorId = data.activeSponsorId;
+      }
+      renderSponsorGrid();
+    }
+
+    function renderSponsorGrid() {
+      if (!sponsorGrid) return;
+      sponsorGrid.innerHTML = "";
+
+      if (!sponsorCatalog.length) {
+        sponsorGridHint.textContent = "No sponsors yet — create one (e.g. IKEA) and upload PNG shapes.";
+        return;
+      }
+
+      sponsorGridHint.textContent = "Click a sponsor to select it, then use Edit circle shapes to add or remove PNGs.";
+
+      for (const sponsor of sponsorCatalog) {
+        const card = document.createElement("article");
+        card.className = "sponsor-card";
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", `Open ${sponsor.name} shape pack`);
+        if (sponsor.id === selectedSponsorId) card.classList.add("is-selected");
+        if (!sponsor.ready) card.classList.add("is-incomplete");
+
+        const need = minShapesRequired - sponsor.shapeCount;
+        const status = sponsor.ready
+          ? `${sponsor.shapeCount} shapes · Ready`
+          : `${sponsor.shapeCount} shapes · need ${need} more`;
+
+        const previews = (sponsor.previewShapes || [])
+          .map((url) => `<img src="${url}" alt="" loading="lazy">`)
+          .join("");
+        const previewHtml = previews
+          ? `<div class="sponsor-thumb-row">${previews}</div>`
+          : `<div class="sponsor-thumb-row sponsor-thumb-empty"><span>No shapes yet</span></div>`;
+
+        card.innerHTML = `
+          <div class="sponsor-card-top">
+            <span class="sponsor-card-check" aria-hidden="true">${sponsor.id === selectedSponsorId ? "✓" : ""}</span>
+            <span class="sponsor-card-name">${escapeHtml(sponsor.name)}</span>
+            <span class="sponsor-card-meta">${status}</span>
+          </div>
+          ${previewHtml}
+          <button type="button" class="sponsor-card-edit-btn ghost-btn">Edit circle shapes</button>
+        `;
+
+        card.addEventListener("click", (event) => {
+          if (event.target.closest(".sponsor-card-edit-btn")) return;
+          activateSponsorCard(sponsor);
+        });
+
+        card.querySelector(".sponsor-card-edit-btn").addEventListener("click", (event) => {
+          event.stopPropagation();
+          activateSponsorCard(sponsor);
+        });
+
+        card.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            activateSponsorCard(sponsor);
+          }
+        });
+
+        sponsorGrid.appendChild(card);
+      }
+
+      updateChosenSponsorBar();
+    }
+
+    editChosenShapesBtn.addEventListener("click", () => {
+      const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
+      if (!sponsor) {
+        setupMessage.textContent = "Choose a sponsor first.";
+        return;
+      }
+      openSponsorEdit(sponsor.id, sponsor.name);
+    });
+
+    changeSponsorBtn.addEventListener("click", () => {
+      selectedSponsorId = null;
+      setupMessage.textContent = "";
+      renderSponsorGrid();
+      updateChosenSponsorBar();
+      sponsorGrid.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+
+    newSponsorBtn.addEventListener("click", () => {
+      setupMessage.textContent = "";
+      openCreateSponsorEdit();
+    });
+
+    editBackBtn.addEventListener("click", () => {
+      showSponsorLibrary();
+      loadSponsorCatalog().then(() => updateChosenSponsorBar()).catch(() => {});
+    });
+
+    async function savePendingShapesToServer() {
+      if (!editContext || editContext.mode !== "edit") return;
+      const pending = editShapeItems.filter((item) => item.pending && item.file);
+      if (!pending.length) return;
+
+      setupMessage.textContent = "Uploading shapes…";
+      try {
+        await uploadPendingShapes(editContext.sponsorId);
+        await openSponsorEdit(editContext.sponsorId, editContext.name);
+        await loadSponsorCatalog();
+        updateChosenSponsorBar();
+        const count = editShapeItems.length;
+        const ready = count >= minShapesRequired;
+        setupMessage.textContent = ready
+          ? `${count} shapes in pack — ready for game.`
+          : `${count} shapes — add ${minShapesRequired - count} more to play.`;
+      } catch (err) {
+        setupMessage.textContent = err.message || "Upload failed.";
+      }
+    }
+
+    editShapesInput.addEventListener("change", async () => {
+      const files = editShapesInput.files;
+      if (!files?.length) return;
+      addPendingShapeFiles(files);
+      editShapesInput.value = "";
+
+      if (editContext?.mode === "edit") {
+        await savePendingShapesToServer();
+      } else {
+        setupMessage.textContent = `${editShapeItems.length} shape(s) selected — tap “Save new pack” when done.`;
+      }
+    });
+
+    editUploadBtn.addEventListener("click", () => {
+      savePendingShapesToServer();
+    });
+
+    editSaveNewPackBtn.addEventListener("click", async () => {
+      const name = editSponsorNameInput.value.trim();
+      const pending = editShapeItems.filter((item) => item.pending && item.file);
+      if (!name) {
+        setupMessage.textContent = "Enter a sponsor name.";
+        return;
+      }
+      if (!pending.length) {
+        setupMessage.textContent = "Upload PNG shapes first — you will see them in edit mode.";
+        return;
+      }
+
+      editSaveNewPackBtn.disabled = true;
+      setupMessage.textContent = "Saving pack…";
+      try {
+        const createRes = await fetch("/api/sponsors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name })
+        });
+        const created = await createRes.json();
+        if (!createRes.ok) throw new Error(created.error || "Could not create pack.");
+
+        editContext = { mode: "edit", sponsorId: created.id, name: created.name };
+        await uploadPendingShapes(created.id);
+        selectedSponsorId = created.id;
+        await loadSponsorCatalog();
+        await openSponsorEdit(created.id, created.name);
+        setupMessage.textContent = `${created.name} saved — ${editShapeItems.length} circle shapes ready.`;
+      } catch (err) {
+        setupMessage.textContent = err.message || "Could not save pack.";
+      }
+      editSaveNewPackBtn.disabled = false;
+    });
+
+    function updateSetupPreview() {
+      applyEventBranding({ title: eventTitleInput.value.trim() || "Your Event Title" });
     }
 
     function showSetupView() {
@@ -321,24 +728,32 @@
       qrImage.src = `/api/qr?url=${encodeURIComponent(url)}`;
     }
 
-    addSponsorBtn.addEventListener("click", () => addSponsorUploadRow());
     eventTitleInput.addEventListener("input", updateSetupPreview);
 
     editEventBtn.addEventListener("click", () => {
-      sponsorUploadList.innerHTML = "";
-      (currentEventBranding.sponsors || []).forEach((sponsor) => addSponsorUploadRow(sponsor));
-      if (!sponsorUploadList.children.length) {
-        addSponsorUploadRow();
-        addSponsorUploadRow();
-      }
+      eventTitleInput.value = currentEventTitle;
       showSetupView();
+      showSponsorLibrary();
       updateSetupPreview();
+      loadSponsorCatalog().catch(() => {});
     });
 
     continueToLobbyBtn.addEventListener("click", async () => {
+      primeGameAudio();
       const title = eventTitleInput.value.trim();
       if (!title) {
         setupMessage.textContent = "Please enter an event title.";
+        return;
+      }
+      if (!selectedSponsorId) {
+        setupMessage.textContent = "Choose a sponsor above, then edit their shapes if needed.";
+        sponsorGrid.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      const picked = sponsorCatalog.find((s) => s.id === selectedSponsorId);
+      if (picked && !picked.ready) {
+        setupMessage.textContent = `“${picked.name}” needs ${minShapesRequired - picked.shapeCount} more shapes — opening edit mode.`;
+        openSponsorEdit(picked.id, picked.name);
         return;
       }
       continueToLobbyBtn.disabled = true;
@@ -347,7 +762,7 @@
         const res = await fetch("/api/event-branding", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, sponsors: collectSponsorsFromForm() })
+          body: JSON.stringify({ title, sponsorId: selectedSponsorId })
         });
         const data = await res.json();
         if (!res.ok) {
@@ -364,22 +779,23 @@
       continueToLobbyBtn.disabled = false;
     });
 
+    loadSponsorCatalog().catch(() => {
+      sponsorGridHint.textContent = "Could not load sponsors. Is the server running?";
+    });
+
     fetch("/api/event-branding")
       .then((res) => res.json())
       .then((branding) => {
-        if (branding.title) {
+        if (branding.title && branding.sponsorId) {
           applyEventBranding(branding);
           showLobbyView();
         } else {
-          addSponsorUploadRow();
-          addSponsorUploadRow();
+          if (branding.sponsorId) applyEventBranding(branding);
           updateSetupPreview();
           showSetupView();
         }
       })
       .catch(() => {
-        addSponsorUploadRow();
-        addSponsorUploadRow();
         showSetupView();
       });
 
@@ -387,9 +803,14 @@
       .then((res) => res.json())
       .then((info) => {
         const url = info.primaryPlayerUrl
-          || (info.playerUrls && info.playerUrls[0])
-          || `${window.location.protocol}//${window.location.hostname}:${info.port || 3001}/mobile`;
+          || `${window.location.origin}/mobile`;
         setJoinLink(url);
+        const joinHint = document.getElementById("joinHint");
+        if (joinHint) {
+          joinHint.textContent = info.isProduction
+            ? "Players can join from anywhere — scan QR or open the link on their phone."
+            : "Phone must be on the same Wi‑Fi as this PC (not mobile data only).";
+        }
       })
       .catch(() => {
         playerJoinUrl.textContent = "Restart the server (npm start) and refresh this page.";
@@ -486,9 +907,15 @@
       return tokens;
     }
 
-    function renderShapes(container, shapes) {
+    function getShapesLayer(circleEl) {
+      return circleEl.querySelector(".circle-shapes-layer");
+    }
+
+    function renderShapes(circleEl, shapes) {
+      const container = getShapesLayer(circleEl);
+      if (!container) return;
       container.innerHTML = "";
-      const size = Math.min(container.clientWidth, container.clientHeight);
+      const size = Math.min(circleEl.clientWidth, circleEl.clientHeight);
       const radius = size / 2;
       const minSize = size * 0.12;
       const maxSize = size * 0.2;
@@ -623,6 +1050,7 @@
 
       roundWinnerOverlay.setAttribute("aria-hidden", "false");
       roundWinnerOverlay.classList.add("show");
+      playRoundWinSound();
 
       roundWinnerHideTimer = setTimeout(hideRoundWinnerOverlay, 4000);
     }
@@ -646,6 +1074,7 @@
     });
 
     startBtn.addEventListener("click", () => {
+      primeGameAudio();
       showGameView();
       socket.emit("hostStartGame");
     });
