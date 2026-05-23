@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const crypto = require("crypto");
 const express = require("express");
 const compression = require("compression");
 const multer = require("multer");
@@ -8,7 +9,7 @@ const { createServer } = require("http");
 const { Server } = require("socket.io");
 const QRCode = require("qrcode");
 const sponsors = require("./lib/sponsors");
-const { PORT, IS_PRODUCTION, PUBLIC_URL, MAX_PLAYERS } = require("./lib/config");
+const { PORT, IS_PRODUCTION, PUBLIC_URL, MAX_PLAYERS, ROUND_TIMEOUT_MS } = require("./lib/config");
 
 const app = express();
 const httpServer = createServer(app);
@@ -18,7 +19,7 @@ if (IS_PRODUCTION) {
 }
 
 const io = new Server(httpServer, {
-  maxHttpBufferSize: 5e6,
+  maxHttpBufferSize: 2e6,
   pingTimeout: 60000,
   pingInterval: 25000,
   connectTimeout: 45000,
@@ -80,15 +81,89 @@ function normalizePhoto(data) {
   return value;
 }
 
-function toLeaderboardEntry(player) {
-  return {
+function toLeaderboardEntry(player, { includePhoto = false } = {}) {
+  const entry = {
     id: player.id,
     name: player.name,
     score: player.score,
-    photo: player.photo,
     countryCode: player.countryCode,
     countryName: player.countryName
   };
+  if (includePhoto) {
+    entry.photo = player.photo;
+  }
+  return entry;
+}
+
+function getPlayerBySocket(socketId) {
+  const playerId = socketToPlayerId.get(socketId);
+  return playerId ? players.get(playerId) : null;
+}
+
+function bindSocketToPlayer(socket, player) {
+  const previousSocketId = player.socketId;
+  if (previousSocketId && previousSocketId !== socket.id) {
+    socketToPlayerId.delete(previousSocketId);
+  }
+  player.socketId = socket.id;
+  socketToPlayerId.set(socket.id, player.id);
+}
+
+function findPlayerByToken(token) {
+  if (!token) return null;
+  for (const player of players.values()) {
+    if (player.token === token) return player;
+  }
+  return null;
+}
+
+function emitPlayerJoined(player) {
+  io.emit("playerJoined", toLeaderboardEntry(player, { includePhoto: true }));
+}
+
+function emitPlayerLeft(playerId) {
+  io.emit("playerLeft", { id: playerId });
+}
+
+function clearRoundTimer() {
+  if (roundTimer) {
+    clearTimeout(roundTimer);
+    roundTimer = null;
+  }
+}
+
+function scheduleRoundTimeout() {
+  clearRoundTimer();
+  if (!game.started || game.ended || !game.currentRound) return;
+
+  roundTimer = setTimeout(() => {
+    roundTimer = null;
+    if (!game.started || game.ended || game.roundLocked || !game.currentRound) return;
+    advanceRoundAfterTimeout();
+  }, ROUND_TIMEOUT_MS);
+}
+
+function advanceRoundAfterTimeout() {
+  if (!game.started || game.ended || !game.currentRound) return;
+
+  game.roundLocked = true;
+  const correctShape = game.currentRound.commonShape;
+
+  io.emit("roundTimeout", {
+    correctShape,
+    roundNumber: game.roundNumber,
+    totalRounds: game.totalRounds
+  });
+  emitGameState();
+
+  setTimeout(() => {
+    if (!game.started || game.ended) return;
+    if (game.roundNumber >= game.totalRounds) {
+      finishGame();
+    } else {
+      startRound();
+    }
+  }, ROUND_WINNER_DISPLAY_MS);
 }
 
 function getShapePool() {
@@ -119,7 +194,9 @@ function getPublicBaseUrl(req) {
 }
 
 const players = new Map();
+const socketToPlayerId = new Map();
 let game = createNewGame();
+let roundTimer = null;
 
 function createNewGame() {
   return {
@@ -165,9 +242,9 @@ function generateRound() {
   return { commonShape, leftShapes, rightShapes, mobileShapes };
 }
 
-function getLeaderboard() {
+function getLeaderboard(options) {
   return [...players.values()]
-    .map(toLeaderboardEntry)
+    .map((player) => toLeaderboardEntry(player, options))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
@@ -186,6 +263,7 @@ function buildGameStatePayload() {
     mobileShapes: game.currentRound ? game.currentRound.mobileShapes : [],
     leaderboard: getLeaderboard(),
     playerCount: players.size,
+    registrationOpen: !game.started || game.ended,
     eventBranding: getEventPayload(),
     eventConfig: getEventPayload()
   };
@@ -202,11 +280,13 @@ function resetRoundMistakes() {
 }
 
 function startRound() {
+  clearRoundTimer();
   game.roundNumber += 1;
   game.roundLocked = false;
   game.currentRound = generateRound();
   resetRoundMistakes();
   emitGameState();
+  scheduleRoundTimeout();
 }
 
 function startGame() {
@@ -219,14 +299,16 @@ function startGame() {
 }
 
 function finishGame() {
+  clearRoundTimer();
   game.ended = true;
   game.started = false;
   game.roundLocked = true;
-  io.emit("gameOver", { leaderboard: getLeaderboard() });
+  io.emit("gameOver", { leaderboard: getLeaderboard({ includePhoto: true }) });
   emitGameState();
 }
 
 function cancelGame() {
+  clearRoundTimer();
   players.forEach((player) => {
     player.score = 0;
     player.roundMistakes = 0;
@@ -236,15 +318,22 @@ function cancelGame() {
 }
 
 function resetSession() {
+  clearRoundTimer();
   const resetMessage = "The host reset the game. Scan the QR code on the host screen to register again.";
-  for (const socketId of players.keys()) {
-    const sock = io.sockets.sockets.get(socketId);
+  for (const player of players.values()) {
+    if (!player.socketId) continue;
+    const sock = io.sockets.sockets.get(player.socketId);
     if (sock) {
       sock.emit("sessionReset", { message: resetMessage });
     }
   }
+  for (const playerId of players.keys()) {
+    emitPlayerLeft(playerId);
+  }
   players.clear();
+  socketToPlayerId.clear();
   game = createNewGame();
+  io.emit("lobbyCleared");
   emitGameState();
 }
 
@@ -424,14 +513,57 @@ app.get("/api/qr", async (req, res, next) => {
 io.on("connection", (socket) => {
   socket.emit("gameState", buildGameStatePayload());
   socket.emit("eventBranding", getEventPayload());
+  const lobbyPlayers = [...players.values()].map((player) =>
+    toLeaderboardEntry(player, { includePhoto: true })
+  );
+  if (lobbyPlayers.length) {
+    socket.emit("lobbySnapshot", { players: lobbyPlayers });
+  }
 
   socket.on("joinPlayer", (payload) => {
+    const playerToken = String(payload?.playerToken || "").trim();
+    const rawName = String(payload?.name || "").trim();
+    const existing = findPlayerByToken(playerToken);
+    const registrationOpen = !game.started || game.ended;
+
+    if (!registrationOpen && !existing) {
+      socket.emit("joinError", {
+        message: "Game in progress — registration is closed. Wait for the host to start a new game."
+      });
+      return;
+    }
+
+    if (playerToken && !existing && !rawName) {
+      socket.emit("joinError", { message: "Session expired. Please register again." });
+      return;
+    }
+
+    if (existing) {
+      if (existing.socketId) {
+        const oldSocket = io.sockets.sockets.get(existing.socketId);
+        if (oldSocket && oldSocket.id !== socket.id) {
+          oldSocket.disconnect(true);
+        }
+      }
+      bindSocketToPlayer(socket, existing);
+      socket.emit("joined", {
+        id: existing.id,
+        token: existing.token,
+        name: existing.name,
+        countryCode: existing.countryCode,
+        countryName: existing.countryName,
+        photo: existing.photo,
+        score: existing.score
+      });
+      emitGameState();
+      return;
+    }
+
     if (players.size >= MAX_PLAYERS) {
       socket.emit("joinError", { message: "Game is full. Try again in a moment." });
       return;
     }
 
-    const rawName = String(payload?.name || "").trim();
     const name = rawName.slice(0, 20);
     const countryCode = String(payload?.countryCode || "").toUpperCase();
     const photo = normalizePhoto(payload?.photo);
@@ -450,16 +582,29 @@ io.on("connection", (socket) => {
     }
 
     const countryName = countriesByCode.get(countryCode);
-    players.set(socket.id, {
-      id: socket.id,
+    const player = {
+      id: crypto.randomUUID(),
+      token: crypto.randomUUID(),
+      socketId: null,
       name,
       score: 0,
       photo,
       countryCode,
       countryName,
       roundMistakes: 0
+    };
+    players.set(player.id, player);
+    bindSocketToPlayer(socket, player);
+    socket.emit("joined", {
+      id: player.id,
+      token: player.token,
+      name,
+      countryCode,
+      countryName,
+      photo,
+      score: player.score
     });
-    socket.emit("joined", { id: socket.id, name, countryCode, countryName, photo });
+    emitPlayerJoined(player);
     emitGameState();
   });
 
@@ -474,7 +619,7 @@ io.on("connection", (socket) => {
   socket.on("playerPick", (payload) => {
     if (!game.started || game.ended || game.roundLocked || !game.currentRound) return;
 
-    const player = players.get(socket.id);
+    const player = getPlayerBySocket(socket.id);
     if (!player) return;
     if ((player.roundMistakes || 0) >= MISTAKES_PER_ROUND) return;
 
@@ -493,8 +638,9 @@ io.on("connection", (socket) => {
     }
 
     game.roundLocked = true;
+    clearRoundTimer();
     player.score += 1;
-    const winner = toLeaderboardEntry(player);
+    const winner = toLeaderboardEntry(player, { includePhoto: true });
 
     io.emit("roundWinner", {
       winner,
@@ -515,7 +661,19 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    players.delete(socket.id);
+    const player = getPlayerBySocket(socket.id);
+    socketToPlayerId.delete(socket.id);
+    if (!player) return;
+
+    player.socketId = null;
+
+    if (game.started && !game.ended) {
+      emitGameState();
+      return;
+    }
+
+    players.delete(player.id);
+    emitPlayerLeft(player.id);
     emitGameState();
   });
 });
@@ -559,6 +717,7 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`Players: ${base}/mobile`);
   console.log(`Health:  ${base}/health`);
   console.log(`Max players: ${MAX_PLAYERS}`);
+  console.log(`Round timeout: ${ROUND_TIMEOUT_MS}ms`);
   if (!IS_PRODUCTION) {
     const lanAddresses = getLanAddresses();
     if (lanAddresses.length) {

@@ -46,6 +46,17 @@ In Render → your service → **Logs**, check:
 | **Starter** | 50–100+ on one instance (recommended) |
 | Free | Testing only; sleeps when idle; shapes reset on redeploy |
 
+For live events, use **Starter** (not Free). Set `MAX_PLAYERS` in Environment if you want a hard cap (default 120).
+
+Optional environment variables:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MAX_PLAYERS` | 120 | Hard cap on registrations |
+| `ROUND_TIMEOUT_MS` | 60000 | Auto-advance round if nobody wins (ms) |
+
+Registration **closes automatically** when the host presses Start. Players who disconnect during a game can reconnect with the same phone (saved token). New scans during an active game are rejected.
+
 ## Keep sponsor shapes after redeploy (optional)
 
 1. Render dashboard → your web service → **Disks** → Add disk (1 GB), mount **`/var/data`**

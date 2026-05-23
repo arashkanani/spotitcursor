@@ -74,6 +74,7 @@
     const shapeGrid = document.getElementById("shapeGrid");
 
     const MISTAKES_PER_ROUND = 3;
+    const PLAYER_TOKEN_KEY = "spotit_player_token";
     let joined = false;
     let myProfile = null;
     let canPick = false;
@@ -200,6 +201,12 @@
     });
 
     socket.on("connect", () => {
+      const token = localStorage.getItem(PLAYER_TOKEN_KEY);
+      if (token) {
+        if (!joined) joinMessage.textContent = "Reconnecting...";
+        socket.emit("joinPlayer", { playerToken: token });
+        return;
+      }
       if (!joined) {
         joinMessage.textContent = "Connected. Enter your details and join.";
       }
@@ -258,6 +265,7 @@
       }
       joinBtn.disabled = true;
       joinMessage.textContent = "Joining...";
+      localStorage.removeItem(PLAYER_TOKEN_KEY);
       socket.emit("joinPlayer", {
         name,
         photo: photoDataUrl,
@@ -266,6 +274,7 @@
     });
 
     socket.on("joinError", (data) => {
+      localStorage.removeItem(PLAYER_TOKEN_KEY);
       joinBtn.disabled = false;
       updateJoinButtonState();
       joinMessage.textContent = data.message || "Could not join.";
@@ -301,10 +310,14 @@
     }
 
     socket.on("sessionReset", (data) => {
+      localStorage.removeItem(PLAYER_TOKEN_KEY);
       showJoinScreen(data?.message);
     });
 
     socket.on("joined", (data) => {
+      if (data.token) {
+        localStorage.setItem(PLAYER_TOKEN_KEY, data.token);
+      }
       joined = true;
       myProfile = {
         id: data.id,
@@ -312,7 +325,7 @@
         photo: data.photo,
         countryCode: data.countryCode,
         countryName: data.countryName,
-        score: 0
+        score: data.score || 0
       };
       playerHeader.innerHTML = renderPlayerProfile(myProfile);
       joinCard.classList.add("hidden");
@@ -335,17 +348,19 @@
     });
 
     socket.on("gameState", (state) => {
-      if (joined) {
-        const stillRegistered = (state.leaderboard || []).some(
-          (p) => p.id === myProfile?.id || (myProfile?.name && p.name === myProfile.name)
-        );
-        if (!stillRegistered) {
-          showJoinScreen("The host started a new session. Scan the QR code to register again.");
-          return;
+      if (!joined) {
+        if (state.registrationOpen === false) {
+          joinMessage.textContent = "Game in progress — registration is closed.";
         }
+        return;
       }
 
-      if (!joined) return;
+      const stillRegistered = (state.leaderboard || []).some((p) => p.id === myProfile?.id);
+      if (!stillRegistered) {
+        localStorage.removeItem(PLAYER_TOKEN_KEY);
+        showJoinScreen("The host started a new session. Scan the QR code to register again.");
+        return;
+      }
 
       if (state.started && !state.ended) {
         resetRoundTries(state.roundNumber || 0);
@@ -365,7 +380,7 @@
 
       canPick = state.started && !state.ended && canPickThisRound;
 
-      const me = (state.leaderboard || []).find((p) => p.id === myProfile?.id || p.name === myProfile?.name);
+      const me = (state.leaderboard || []).find((p) => p.id === myProfile?.id);
       if (me) {
         myProfile.score = me.score;
         playerHeader.innerHTML = renderPlayerProfile(myProfile);
@@ -387,6 +402,13 @@
       canPickThisRound = false;
       mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}.`;
       playRoundWinSound();
+    });
+
+    socket.on("roundTimeout", (data) => {
+      if (!joined) return;
+      canPick = false;
+      canPickThisRound = false;
+      mobileStatus.textContent = `Time's up — round ${data.roundNumber} ended with no winner.`;
     });
 
     socket.on("gameOver", (data) => {

@@ -253,6 +253,20 @@
 
     let primaryJoinUrl = "";
     let latestLeaderboard = [];
+    const playerPhotos = new Map();
+
+    function cachePlayerPhoto(player) {
+      if (player?.id && player.photo) {
+        playerPhotos.set(player.id, player.photo);
+      }
+    }
+
+    function enrichLeaderboard(leaderboard) {
+      return (leaderboard || []).map((player) => ({
+        ...player,
+        photo: player.photo || playerPhotos.get(player.id) || ""
+      }));
+    }
     let currentEventTitle = "";
     let selectedSponsorId = null;
     let sponsorCatalog = [];
@@ -900,23 +914,40 @@
         playerJoinUrl.textContent = "Restart the server (npm start) and refresh this page.";
       });
 
+    socket.on("playerJoined", (player) => {
+      cachePlayerPhoto(player);
+    });
+
+    socket.on("playerLeft", (data) => {
+      if (data?.id) playerPhotos.delete(data.id);
+    });
+
+    socket.on("lobbySnapshot", (data) => {
+      (data.players || []).forEach(cachePlayerPhoto);
+    });
+
+    socket.on("lobbyCleared", () => {
+      playerPhotos.clear();
+    });
+
     function renderLobbyPlayers(leaderboard) {
+      const board = enrichLeaderboard(leaderboard);
       lobbyPlayerList.innerHTML = "";
-      if (!leaderboard || leaderboard.length === 0) {
+      if (!board.length) {
         lobbyPlayerList.innerHTML = "<li class='rank-item rank-empty'><div class='leaderboard-empty'>No players yet — waiting for scan…</div></li>";
         lobbyStatus.textContent = "Waiting for players to scan and join...";
         startBtn.disabled = true;
         return;
       }
 
-      leaderboard.forEach((player, index) => {
+      board.forEach((player, index) => {
         const li = document.createElement("li");
         li.className = "rank-item";
         li.innerHTML = renderLeaderboardItem(player, index);
         lobbyPlayerList.appendChild(li);
       });
 
-      const count = leaderboard.length;
+      const count = board.length;
       lobbyStatus.textContent = `${count} player${count === 1 ? "" : "s"} ready. Press Start when everyone has joined.`;
       startBtn.disabled = false;
     }
@@ -1105,12 +1136,13 @@
     }
 
     function renderRanking(leaderboard) {
+      const board = enrichLeaderboard(leaderboard);
       rankingList.innerHTML = "";
-      if (!leaderboard || leaderboard.length === 0) {
+      if (!board.length) {
         rankingList.innerHTML = "<li class='rank-item rank-empty'><div class='leaderboard-empty'>No players on board yet</div></li>";
         return;
       }
-      leaderboard.forEach((player, index) => {
+      board.forEach((player, index) => {
         const li = document.createElement("li");
         li.className = "rank-item";
         li.innerHTML = renderLeaderboardItem(player, index);
@@ -1132,7 +1164,7 @@
       if (state.started && !state.ended) {
         showGameView();
         renderRanking(state.leaderboard);
-        statusText.textContent = `Round ${state.roundNumber} / ${state.totalRounds}`;
+        statusText.textContent = `Round ${state.roundNumber} / ${state.totalRounds} · ${state.playerCount || 0} players`;
         const round = state.currentRound || {};
         scheduleRenderGameCircles(round.leftShapes, round.rightShapes);
         return;
@@ -1159,9 +1191,10 @@
 
     function resolveWinner(data) {
       const incoming = data.winner || {};
+      cachePlayerPhoto(incoming);
       const fromBoard = latestLeaderboard.find((p) => p.id === incoming.id)
         || latestLeaderboard.find((p) => p.name === incoming.name);
-      return { ...fromBoard, ...incoming };
+      return enrichLeaderboard([{ ...fromBoard, ...incoming }])[0];
     }
 
     function setWinnerPhoto(photoUrl) {
@@ -1228,6 +1261,12 @@
       showRoundWinnerOverlay(data);
     });
 
+    socket.on("roundTimeout", (data) => {
+      if (!data) return;
+      statusText.textContent = `Round ${data.roundNumber} — time's up, no winner`;
+      hideRoundWinnerOverlay();
+    });
+
     socket.on("gameOver", (data) => {
       if (hostPinnedView === "setup") return;
       showLobbyView();
@@ -1238,6 +1277,7 @@
       }
       lobbyStatus.textContent = `Game over. Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score}). Press Start for a rematch.`;
       renderLobbyPlayers(data.leaderboard);
+      (data.leaderboard || []).forEach(cachePlayerPhoto);
       startBtn.disabled = false;
     });
 
