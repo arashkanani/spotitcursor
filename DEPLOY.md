@@ -11,6 +11,21 @@
 
 `RENDER_EXTERNAL_URL` is set automatically on Render — QR codes use it. You do **not** need to set `PUBLIC_URL` unless you use a custom domain.
 
+## Sponsor shapes on Render
+
+Circle icons are PNG files under `data/sponsors/` (gitignored locally). The repo ships a **seed pack** in `seed/sponsors/` (IKEA + OORDOO). On each deploy/start the server copies any missing PNGs from `seed/` into `data/`.
+
+After you change shapes locally, refresh the seed and push:
+
+```bash
+npm run seed:sync
+git add seed/
+git commit -m "Update sponsor shape seed pack"
+git push
+```
+
+Then **Manual sync** on Render. Without pushing `seed/`, production only has shapes you upload on the live host setup screen.
+
 ## If deploy failed
 
 Common causes we fixed:

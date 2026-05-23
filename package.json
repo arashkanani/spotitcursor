@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "echo \"No tests configured\""
+    "test": "echo \"No tests configured\"",
+    "seed:sync": "node scripts/sync-seed.js"
   },
   "engines": {
     "node": ">=20"

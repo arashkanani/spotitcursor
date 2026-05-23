@@ -1041,9 +1041,13 @@ button:disabled {
   transform: none;
 }
 
-.game-branding-bar .round-pill {
+.game-branding-bar #backToMenuBtn {
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.game-branding-bar .round-pill {
+  flex-shrink: 0;
 }
 
 .host-lobby {

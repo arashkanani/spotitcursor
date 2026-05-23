@@ -230,12 +230,7 @@
       (shapes || []).forEach((shape) => {
         const btn = document.createElement("button");
         btn.className = "shape-btn";
-        const src = String(shape);
-        btn.innerHTML = `<img class="shape-btn-photo" src="${src}" alt="shape">`;
-        const img = btn.querySelector("img");
-        img.addEventListener("error", () => {
-          btn.innerHTML = `<span class="shape-icon">⬤</span>`;
-        });
+        mountShapeContent(btn, shape, "shape-btn-photo");
         btn.title = "shape";
         btn.setAttribute("aria-label", "shape");
         btn.addEventListener("click", () => {

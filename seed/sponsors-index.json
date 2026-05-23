@@ -1,0 +1,17 @@
+{
+  "sponsors": [
+    {
+      "id": "ikea",
+      "name": "IKEA",
+      "createdAt": "2026-05-23T05:56:09.794Z",
+      "updatedAt": "2026-05-23T05:56:09.880Z"
+    },
+    {
+      "id": "oordoo",
+      "name": "OORDOO",
+      "createdAt": "2026-05-23T06:06:06.033Z",
+      "updatedAt": "2026-05-23T07:08:57.875Z"
+    }
+  ],
+  "activeSponsorId": "oordoo"
+}

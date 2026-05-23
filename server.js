@@ -226,6 +226,15 @@ function finishGame() {
   emitGameState();
 }
 
+function cancelGame() {
+  players.forEach((player) => {
+    player.score = 0;
+    player.roundMistakes = 0;
+  });
+  game = createNewGame();
+  emitGameState();
+}
+
 app.use(compression());
 app.use(express.json({ limit: "12mb" }));
 app.use(express.static(path.join(__dirname, "public"), {
@@ -441,6 +450,10 @@ io.on("connection", (socket) => {
     startGame();
   });
 
+  socket.on("hostResetGame", () => {
+    cancelGame();
+  });
+
   socket.on("playerPick", (payload) => {
     if (!game.started || game.ended || game.roundLocked || !game.currentRound) return;
 
@@ -475,6 +488,7 @@ io.on("connection", (socket) => {
     emitGameState();
 
     setTimeout(() => {
+      if (!game.started || game.ended) return;
       if (game.roundNumber >= game.totalRounds) {
         finishGame();
       } else {
@@ -538,4 +552,4 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     }
   }
 });
-
+

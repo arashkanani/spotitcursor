@@ -58,6 +58,63 @@ function playRoundWinSound() {
   }
 }
 
+const FALLBACK_SHAPE_ICONS = {
+  circle: "⭕",
+  square: "⬜",
+  triangle: "🔺",
+  star: "⭐",
+  heart: "❤️",
+  diamond: "💎",
+  moon: "🌙",
+  sun: "☀️",
+  cloud: "☁️",
+  bolt: "⚡",
+  hexagon: "⬡",
+  cross: "✖️",
+  drop: "💧",
+  leaf: "🍃",
+  fish: "🐟",
+  apple: "🍎",
+  key: "🔑",
+  bell: "🔔",
+  flag: "🚩",
+  gift: "🎁"
+};
+
+function isShapeImageUrl(shape) {
+  const value = String(shape || "");
+  return (
+    value.startsWith("/") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:")
+  );
+}
+
+function shapeIconChar(shape) {
+  const key = String(shape || "").toLowerCase();
+  return FALLBACK_SHAPE_ICONS[key] || "⬤";
+}
+
+function renderShapeElement(shape, imgClass) {
+  const className = imgClass || "shape-photo";
+  if (isShapeImageUrl(shape)) {
+    const src = escapeHtml(shape);
+    return `<img class="${className}" src="${src}" alt="shape">`;
+  }
+  return `<span class="shape-icon">${shapeIconChar(shape)}</span>`;
+}
+
+function mountShapeContent(parentEl, shape, imgClass) {
+  parentEl.innerHTML = renderShapeElement(shape, imgClass);
+  if (!isShapeImageUrl(shape)) return;
+  const img = parentEl.querySelector("img");
+  if (!img) return;
+  img.addEventListener("error", () => {
+    parentEl.innerHTML = `<span class="shape-icon">${shapeIconChar(shape)}</span>`;
+  });
+}
+
 function countryFlagUrl(code) {
   if (!code || String(code).length !== 2) return "";
   return `/flags/${String(code).toLowerCase()}.svg`;

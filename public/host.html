@@ -153,6 +153,7 @@
           <h2 class="event-title" data-event-title>Shape Match</h2>
           <p class="event-sponsor-line" data-event-sponsor hidden></p>
         </div>
+        <button type="button" id="backToMenuBtn" class="edit-event-btn" title="End game and return to event setup">← Main menu</button>
         <div class="round-pill" id="statusText">Round 1 / 20</div>
       </header>
 
@@ -230,6 +231,8 @@
     const continueToLobbyBtn = document.getElementById("continueToLobbyBtn");
     const setupMessage = document.getElementById("setupMessage");
     const editEventBtn = document.getElementById("editEventBtn");
+    const backToMenuBtn = document.getElementById("backToMenuBtn");
+    let hostPinnedView = null;
     const playerJoinUrl = document.getElementById("playerJoinUrl");
     const qrImage = document.getElementById("qrImage");
     const lobbyPlayerList = document.getElementById("lobbyPlayerList");
@@ -705,18 +708,21 @@
     }
 
     function showSetupView() {
+      hostPinnedView = "setup";
       setupView.classList.remove("hidden");
       lobbyView.classList.add("hidden");
       gameView.classList.add("hidden");
     }
 
     function showLobbyView() {
+      hostPinnedView = null;
       setupView.classList.add("hidden");
       lobbyView.classList.remove("hidden");
       gameView.classList.add("hidden");
     }
 
     function showGameView() {
+      hostPinnedView = null;
       setupView.classList.add("hidden");
       lobbyView.classList.add("hidden");
       gameView.classList.remove("hidden");
@@ -735,6 +741,28 @@
       showSetupView();
       showSponsorLibrary();
       updateSetupPreview();
+      loadSponsorCatalog().catch(() => {});
+    });
+
+    backToMenuBtn.addEventListener("click", () => {
+      if (
+        !window.confirm(
+          "End the current game and return to event setup? Player scores will reset. Players stay connected and wait for the next game."
+        )
+      ) {
+        return;
+      }
+      hideRoundWinnerOverlay();
+      if (roundWinnerHideTimer) {
+        clearTimeout(roundWinnerHideTimer);
+        roundWinnerHideTimer = null;
+      }
+      socket.emit("hostResetGame");
+      eventTitleInput.value = currentEventTitle;
+      showSetupView();
+      showSponsorLibrary();
+      updateSetupPreview();
+      setupMessage.textContent = "Set up your event, then continue to the lobby when ready.";
       loadSponsorCatalog().catch(() => {});
     });
 
@@ -933,12 +961,7 @@
         item.style.opacity = String(randomInRange(0.45, 0.95));
         item.style.transform = `translate(-50%, -50%) rotate(${randomInRange(-28, 28)}deg)`;
         item.style.setProperty("--shape-size", `${slot.size * 0.58}px`);
-        const src = String(shape);
-        item.innerHTML = `<img class="shape-photo" src="${src}" alt="shape">`;
-        const img = item.querySelector("img");
-        img.addEventListener("error", () => {
-          item.innerHTML = `<span class="shape-icon">⬤</span>`;
-        });
+        mountShapeContent(item, shape, "shape-photo");
         container.appendChild(item);
       });
     }
@@ -964,6 +987,8 @@
     socket.on("gameState", (state) => {
       latestLeaderboard = state.leaderboard || [];
       if (state.eventBranding) applyEventBranding(state.eventBranding);
+
+      if (hostPinnedView === "setup") return;
 
       if (state.started && !state.ended) {
         showGameView();
@@ -1062,6 +1087,7 @@
     });
 
     socket.on("gameOver", (data) => {
+      if (hostPinnedView === "setup") return;
       showLobbyView();
       if (!data.leaderboard.length) {
         lobbyStatus.textContent = "Game over. No players joined.";
