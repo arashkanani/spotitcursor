@@ -235,6 +235,19 @@ function cancelGame() {
   emitGameState();
 }
 
+function resetSession() {
+  const resetMessage = "The host reset the game. Scan the QR code on the host screen to register again.";
+  for (const socketId of players.keys()) {
+    const sock = io.sockets.sockets.get(socketId);
+    if (sock) {
+      sock.emit("sessionReset", { message: resetMessage });
+    }
+  }
+  players.clear();
+  game = createNewGame();
+  emitGameState();
+}
+
 app.use(compression());
 app.use(express.json({ limit: "12mb" }));
 app.use(express.static(path.join(__dirname, "public"), {
@@ -292,6 +305,10 @@ app.put("/api/event-branding", (req, res) => {
       error: `This sponsor needs at least ${sponsors.MIN_SHAPES_PER_SPONSOR} PNG shapes (has ${sponsor.shapeCount}).`
     });
     return;
+  }
+
+  if (game.started && !game.ended) {
+    cancelGame();
   }
 
   sponsors.setActiveSponsorId(sponsorId);
@@ -451,7 +468,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("hostResetGame", () => {
-    cancelGame();
+    resetSession();
   });
 
   socket.on("playerPick", (payload) => {

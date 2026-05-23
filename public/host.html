@@ -92,6 +92,10 @@
             <button type="button" id="editUploadBtn" class="start-game-btn hidden">Upload selected shapes</button>
             <button type="button" id="editSaveNewPackBtn" class="start-game-btn hidden">Save new pack</button>
           </div>
+
+          <div class="edit-done-row">
+            <button type="button" id="editDoneBtn" class="start-game-btn">Done editing →</button>
+          </div>
         </div>
 
         <div class="setup-section setup-section-event">
@@ -109,7 +113,9 @@
         </header>
 
         <p class="status" id="setupMessage"></p>
-        <button type="button" id="continueToLobbyBtn" class="start-game-btn">Continue to player lobby →</button>
+        <div class="setup-continue-row">
+          <button type="button" id="continueToLobbyBtn" class="start-game-btn">Continue to player lobby →</button>
+        </div>
       </div>
     </section>
 
@@ -214,6 +220,7 @@
     const changeSponsorBtn = document.getElementById("changeSponsorBtn");
     const newSponsorBtn = document.getElementById("newSponsorBtn");
     const editBackBtn = document.getElementById("editBackBtn");
+    const editDoneBtn = document.getElementById("editDoneBtn");
     const editModeTitle = document.getElementById("editModeTitle");
     const editModeHint = document.getElementById("editModeHint");
     const editIncompleteBanner = document.getElementById("editIncompleteBanner");
@@ -294,10 +301,21 @@
       });
     }
 
-    function activateSponsorCard(sponsor) {
+    function activateSponsorCard(sponsor, options = {}) {
+      const openEditor = options.openEditor === true;
       selectSponsor(sponsor.id);
-      setupMessage.textContent = `Opening ${sponsor.name} — add or delete circle shapes below.`;
-      openSponsorEdit(sponsor.id, sponsor.name);
+      if (openEditor || !sponsor.ready) {
+        if (!sponsor.ready) {
+          setupMessage.textContent = `“${sponsor.name}” needs more shapes — add PNGs below.`;
+        } else {
+          setupMessage.textContent = `Editing ${sponsor.name} — tap “← All packs” when done, then continue to the lobby.`;
+        }
+        openSponsorEdit(sponsor.id, sponsor.name);
+        return;
+      }
+      showSponsorLibrary();
+      setupMessage.textContent = `${sponsor.name} selected (${sponsor.shapeCount} shapes). Enter event title and continue to the lobby.`;
+      continueToLobbyBtn.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
     function updateChosenSponsorBar() {
@@ -582,18 +600,18 @@
 
         card.addEventListener("click", (event) => {
           if (event.target.closest(".sponsor-card-edit-btn")) return;
-          activateSponsorCard(sponsor);
+          activateSponsorCard(sponsor, { openEditor: false });
         });
 
         card.querySelector(".sponsor-card-edit-btn").addEventListener("click", (event) => {
           event.stopPropagation();
-          activateSponsorCard(sponsor);
+          activateSponsorCard(sponsor, { openEditor: true });
         });
 
         card.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            activateSponsorCard(sponsor);
+            activateSponsorCard(sponsor, { openEditor: false });
           }
         });
 
@@ -625,10 +643,22 @@
       openCreateSponsorEdit();
     });
 
-    editBackBtn.addEventListener("click", () => {
+    function finishSponsorEdit() {
       showSponsorLibrary();
-      loadSponsorCatalog().then(() => updateChosenSponsorBar()).catch(() => {});
-    });
+      loadSponsorCatalog()
+        .then(() => {
+          updateChosenSponsorBar();
+          const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
+          if (sponsor?.ready) {
+            setupMessage.textContent = `${sponsor.name} is ready — continue to the player lobby when you are set.`;
+            continueToLobbyBtn.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        })
+        .catch(() => {});
+    }
+
+    editBackBtn.addEventListener("click", finishSponsorEdit);
+    editDoneBtn.addEventListener("click", finishSponsorEdit);
 
     async function savePendingShapesToServer() {
       if (!editContext || editContext.mode !== "edit") return;
@@ -747,7 +777,7 @@
     backToMenuBtn.addEventListener("click", () => {
       if (
         !window.confirm(
-          "End the current game and return to event setup? Player scores will reset. Players stay connected and wait for the next game."
+          "End the game and return to event setup? All players will be removed and must scan the QR code again to register."
         )
       ) {
         return;
@@ -762,31 +792,52 @@
       showSetupView();
       showSponsorLibrary();
       updateSetupPreview();
-      setupMessage.textContent = "Set up your event, then continue to the lobby when ready.";
+      setupMessage.textContent = "Players were cleared — after setup, continue to the lobby so they can scan the QR and join again.";
       loadSponsorCatalog().catch(() => {});
     });
 
     continueToLobbyBtn.addEventListener("click", async () => {
       primeGameAudio();
+      hostPinnedView = null;
+
       const title = eventTitleInput.value.trim();
       if (!title) {
         setupMessage.textContent = "Please enter an event title.";
+        eventTitleInput.focus();
+        eventTitleInput.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
+
+      try {
+        await loadSponsorCatalog();
+      } catch (_err) {
+        setupMessage.textContent = "Could not load sponsors. Is the server running?";
+        return;
+      }
+
       if (!selectedSponsorId) {
-        setupMessage.textContent = "Choose a sponsor above, then edit their shapes if needed.";
+        setupMessage.textContent = "Choose a sponsor above, then continue to the lobby.";
+        showSponsorLibrary();
         sponsorGrid.scrollIntoView({ behavior: "smooth", block: "start" });
         return;
       }
+
       const picked = sponsorCatalog.find((s) => s.id === selectedSponsorId);
-      if (picked && !picked.ready) {
-        setupMessage.textContent = `“${picked.name}” needs ${minShapesRequired - picked.shapeCount} more shapes — opening edit mode.`;
-        openSponsorEdit(picked.id, picked.name);
+      if (!picked) {
+        setupMessage.textContent = "That sponsor pack is missing on the server — pick another or create a new one.";
+        showSponsorLibrary();
         return;
       }
+      if (!picked.ready) {
+        setupMessage.textContent = `“${picked.name}” needs ${minShapesRequired - picked.shapeCount} more shapes — opening edit mode.`;
+        activateSponsorCard(picked, { openEditor: true });
+        return;
+      }
+
       continueToLobbyBtn.disabled = true;
       setupMessage.textContent = "Saving…";
       try {
+        socket.emit("hostResetGame");
         const res = await fetch("/api/event-branding", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -796,11 +847,13 @@
         if (!res.ok) {
           setupMessage.textContent = data.error || "Could not save event details.";
           continueToLobbyBtn.disabled = false;
+          continueToLobbyBtn.scrollIntoView({ behavior: "smooth", block: "nearest" });
           return;
         }
         applyEventBranding(data);
         setupMessage.textContent = "";
         showLobbyView();
+        renderLobbyPlayers(latestLeaderboard);
       } catch (_err) {
         setupMessage.textContent = "Could not save. Is the server running?";
       }
@@ -982,6 +1035,7 @@
 
     socket.on("eventBranding", (branding) => {
       applyEventBranding(branding);
+      if (hostPinnedView === "setup") return;
     });
 
     socket.on("gameState", (state) => {

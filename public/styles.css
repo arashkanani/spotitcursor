@@ -812,6 +812,19 @@ button:disabled {
   margin-top: 0.5rem;
 }
 
+.setup-continue-row {
+  margin-top: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.edit-done-row {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-glass);
+  display: flex;
+  justify-content: center;
+}
+
 .edit-mode-header {
   display: flex;
   align-items: flex-start;

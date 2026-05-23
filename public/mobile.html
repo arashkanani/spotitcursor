@@ -271,9 +271,43 @@
       joinMessage.textContent = data.message || "Could not join.";
     });
 
+    function showJoinScreen(message) {
+      joined = false;
+      myProfile = null;
+      canPick = false;
+      canPickThisRound = true;
+      mistakesThisRound = 0;
+      lastRoundNumber = 0;
+      lastMobileShapesKey = "";
+      shapeGrid.innerHTML = "";
+
+      joinCard.classList.remove("hidden");
+      gameCard.classList.add("hidden");
+
+      nameInput.value = "";
+      photoDataUrl = "";
+      photoPreview.removeAttribute("src");
+      photoPreview.classList.add("hidden");
+      selectedCountryCode = "";
+      countryChosen.classList.add("hidden");
+      countryChosen.innerHTML = "";
+      countrySearch.value = "";
+      countryResults.classList.add("hidden");
+      photoInput.value = "";
+
+      joinBtn.disabled = true;
+      updateJoinButtonState();
+      joinMessage.textContent = message || "Scan the QR code on the host screen to join.";
+    }
+
+    socket.on("sessionReset", (data) => {
+      showJoinScreen(data?.message);
+    });
+
     socket.on("joined", (data) => {
       joined = true;
       myProfile = {
+        id: data.id,
         name: data.name,
         photo: data.photo,
         countryCode: data.countryCode,
@@ -284,6 +318,8 @@
       joinCard.classList.add("hidden");
       gameCard.classList.remove("hidden");
       mobileStatus.textContent = "Joined. Waiting for host to start...";
+      joinBtn.disabled = false;
+      updateJoinButtonState();
     });
 
     socket.on("pickResult", (data) => {
@@ -299,6 +335,16 @@
     });
 
     socket.on("gameState", (state) => {
+      if (joined) {
+        const stillRegistered = (state.leaderboard || []).some(
+          (p) => p.id === myProfile?.id || (myProfile?.name && p.name === myProfile.name)
+        );
+        if (!stillRegistered) {
+          showJoinScreen("The host started a new session. Scan the QR code to register again.");
+          return;
+        }
+      }
+
       if (!joined) return;
 
       if (state.started && !state.ended) {
