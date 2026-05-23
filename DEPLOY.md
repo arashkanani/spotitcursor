@@ -2,34 +2,44 @@
 
 ## Quick steps
 
-1. Push this repo to **GitHub**.
-2. [render.com](https://render.com) → **New** → **Blueprint** → connect repo (uses `render.yaml`).
-3. After deploy, open **Environment** and set:
-   - `PUBLIC_URL` = `https://YOUR-SERVICE-NAME.onrender.com` (your real URL, no trailing slash)
-4. Open the host URL in a browser: `https://YOUR-SERVICE-NAME.onrender.com/`
-5. Players join: `https://YOUR-SERVICE-NAME.onrender.com/mobile` (QR code on host uses this automatically).
+1. Push the latest `main` branch to GitHub.
+2. [render.com](https://render.com) → your Blueprint **spotit3** → **Manual sync** (or enable auto-deploy).
+3. Wait until the web service shows **Live** (not Deploy failed).
+4. Open your service URL:
+   - **Host:** `https://YOUR-SERVICE.onrender.com/`
+   - **Players:** `https://YOUR-SERVICE.onrender.com/mobile`
+
+`RENDER_EXTERNAL_URL` is set automatically on Render — QR codes use it. You do **not** need to set `PUBLIC_URL` unless you use a custom domain.
+
+## If deploy failed
+
+Common causes we fixed:
+
+- **Persistent disk** in `render.yaml` — removed; use app `data/` folder first (works on Starter).
+- **`PUBLIC_URL` missing** — app now uses Render’s `RENDER_EXTERNAL_URL`.
+- **Build** — uses `npm ci --omit=dev` (needs `package-lock.json` in repo).
+
+In Render → your service → **Logs**, check:
+
+- `Build logs` — npm install errors
+- `Deploy logs` — crash on start (look for `Server failed to start`)
 
 ## Plan recommendation
 
 | Plan | Players |
 |------|---------|
-| **Starter** ($7/mo) | 50–100+ on one instance (recommended) |
-| Free | OK for testing; sleeps when idle; **no persistent disk** (uploaded shapes lost on redeploy) |
+| **Starter** | 50–100+ on one instance (recommended) |
+| Free | Testing only; sleeps when idle; shapes reset on redeploy |
 
-`render.yaml` uses **Starter** + **1 GB persistent disk** at `/var/data` so sponsor shapes survive restarts.
+## Keep sponsor shapes after redeploy (optional)
 
-## What was configured for production
-
-- `PORT` from Render
-- `PUBLIC_URL` for QR / join links (required on Render)
-- Persistent `DATA_DIR` for sponsor shape packs
-- Health check: `GET /health`
-- Socket.io tuned for many mobile connections
-- Player cap default: 120 (`MAX_PLAYERS` env)
+1. Render dashboard → your web service → **Disks** → Add disk (1 GB), mount **`/var/data`**
+2. **Environment** → add `DATA_DIR` = `/var/data`
+3. Redeploy
 
 ## Manual deploy (without Blueprint)
 
-- **Build:** `npm install --omit=dev`
+- **Build:** `npm ci --omit=dev`
 - **Start:** `npm start`
 - **Health check path:** `/health`
 
