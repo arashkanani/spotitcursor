@@ -58,15 +58,15 @@
               <p class="custom-bg-adjust-hint">Drag sliders to position and zoom your image on the live preview, lobby, and game screen.</p>
               <div class="custom-bg-adjust-row">
                 <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
-                <input type="range" id="bgPosX" min="0" max="100" value="50" step="1">
+                <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
               </div>
               <div class="custom-bg-adjust-row">
                 <label for="bgPosY">Vertical position <output id="bgPosYValue">50</output>%</label>
-                <input type="range" id="bgPosY" min="0" max="100" value="50" step="1">
+                <input type="range" id="bgPosY" min="-50" max="150" value="50" step="1">
               </div>
               <div class="custom-bg-adjust-row">
                 <label for="bgScale">Zoom <output id="bgScaleValue">100</output>%</label>
-                <input type="range" id="bgScale" min="50" max="250" value="100" step="5">
+                <input type="range" id="bgScale" min="25" max="500" value="100" step="5">
               </div>
               <button type="button" id="resetBgAdjustBtn" class="custom-bg-adjust-reset">Reset position &amp; zoom</button>
             </div>
@@ -417,16 +417,21 @@
       return String(url).split("?")[0] || null;
     }
 
+    const BG_POS_MIN = -50;
+    const BG_POS_MAX = 150;
+    const BG_SCALE_MIN = 25;
+    const BG_SCALE_MAX = 500;
+
     function clampBgPercent(value, fallback = 50) {
       const n = Number(value);
       if (!Number.isFinite(n)) return fallback;
-      return Math.min(100, Math.max(0, Math.round(n)));
+      return Math.min(BG_POS_MAX, Math.max(BG_POS_MIN, Math.round(n)));
     }
 
     function clampBgScale(value, fallback = 100) {
       const n = Number(value);
       if (!Number.isFinite(n)) return fallback;
-      return Math.min(250, Math.max(50, Math.round(n)));
+      return Math.min(BG_SCALE_MAX, Math.max(BG_SCALE_MIN, Math.round(n)));
     }
 
     function getBackgroundTransformPayload() {

@@ -87,9 +87,9 @@
         const v = branding?.updatedAt
           ? new Date(branding.updatedAt).getTime()
           : Date.now();
-        const posX = Math.min(100, Math.max(0, Number(branding?.customBackgroundPosX) || 50));
-        const posY = Math.min(100, Math.max(0, Number(branding?.customBackgroundPosY) || 50));
-        const scale = Math.min(250, Math.max(50, Number(branding?.customBackgroundScale) || 100));
+        const posX = Math.min(150, Math.max(-50, Number(branding?.customBackgroundPosX) || 50));
+        const posY = Math.min(150, Math.max(-50, Number(branding?.customBackgroundPosY) || 50));
+        const scale = Math.min(500, Math.max(25, Number(branding?.customBackgroundScale) || 100));
         document.body.style.setProperty("--custom-bg-url", `url("${base}?v=${v}")`);
         document.body.style.setProperty("--custom-bg-pos-x", `${posX}%`);
         document.body.style.setProperty("--custom-bg-pos-y", `${posY}%`);
