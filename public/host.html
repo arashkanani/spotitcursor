@@ -47,6 +47,9 @@
             <div id="backgroundPicker" class="theme-option-grid theme-bg-grid" role="listbox" aria-label="Background"></div>
             <div class="background-upload-row">
               <label class="photo-upload-btn" for="customBackgroundInput">Upload custom background</label>
+              <button type="button" id="clearCustomBackgroundBtn" class="clear-background-btn" hidden>
+                Remove upload
+              </button>
               <input id="customBackgroundInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
               <span id="customBackgroundStatus" class="setup-hint"></span>
             </div>
@@ -286,6 +289,7 @@
     const backToPatternsBtn = document.getElementById("backToPatternsBtn");
     const selectedPatternBadge = document.getElementById("selectedPatternBadge");
     const customBackgroundInput = document.getElementById("customBackgroundInput");
+    const clearCustomBackgroundBtn = document.getElementById("clearCustomBackgroundBtn");
     const customBackgroundStatus = document.getElementById("customBackgroundStatus");
     const circlesPanelTransparentInput = document.getElementById("circlesPanelTransparent");
     const rankingPanelTransparentInput = document.getElementById("rankingPanelTransparent");
@@ -419,6 +423,63 @@
       }
 
       syncThemePickerUi();
+      updateClearBackgroundButton();
+    }
+
+    function updateClearBackgroundButton() {
+      if (!clearCustomBackgroundBtn) return;
+      clearCustomBackgroundBtn.hidden = !customBackgroundUrl;
+    }
+
+    async function parseApiJson(res) {
+      const text = await res.text();
+      if (!text) return {};
+      try {
+        return JSON.parse(text);
+      } catch (_err) {
+        if (text.trimStart().startsWith("<")) {
+          throw new Error("Clear API not found on server — redeploy, or click a color preset.");
+        }
+        throw new Error("Invalid server response.");
+      }
+    }
+
+    async function clearCustomBackground() {
+      if (!customBackgroundUrl && selectedThemeBackground !== "custom") return;
+      const fallbackBg = PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight";
+      if (customBackgroundStatus) customBackgroundStatus.textContent = "Removing upload…";
+      clearCustomBackgroundBtn.disabled = true;
+      try {
+        let res = await fetch("/api/event-background/clear", { method: "POST" });
+        let data = await parseApiJson(res);
+
+        if (!res.ok) {
+          res = await fetch("/api/event-branding/theme", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              themePattern: selectedThemePattern,
+              themeBackground: fallbackBg
+            })
+          });
+          data = await parseApiJson(res);
+          if (!res.ok) throw new Error(data.error || "Could not remove upload");
+        }
+
+        const nextBg = data.themeBackground || fallbackBg;
+        applyGameTheme(data.themePattern || selectedThemePattern, nextBg, null);
+        if (customBackgroundStatus) {
+          customBackgroundStatus.textContent = "Upload removed — using preset background.";
+        }
+        updateSetupPreview();
+      } catch (err) {
+        if (customBackgroundStatus) {
+          customBackgroundStatus.textContent = err.message || "Could not remove upload.";
+        }
+      } finally {
+        clearCustomBackgroundBtn.disabled = false;
+        updateClearBackgroundButton();
+      }
     }
 
     async function persistThemeSelection() {
@@ -1006,6 +1067,10 @@
       patternLaunchGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
+    clearCustomBackgroundBtn?.addEventListener("click", () => {
+      void clearCustomBackground();
+    });
+
     customBackgroundInput?.addEventListener("change", async () => {
       const file = customBackgroundInput.files?.[0];
       if (!file) return;
@@ -1018,6 +1083,7 @@
         if (!res.ok) throw new Error(data.error || "Upload failed");
         applyEventBranding(data);
         if (customBackgroundStatus) customBackgroundStatus.textContent = "Custom background applied.";
+        updateClearBackgroundButton();
         updateSetupPreview();
       } catch (err) {
         if (customBackgroundStatus) customBackgroundStatus.textContent = err.message || "Could not upload.";
@@ -1195,6 +1261,7 @@
         return;
       }
       hideRoundWinnerOverlay();
+      roundCelebrationActive = false;
       if (roundWinnerHideTimer) {
         clearTimeout(roundWinnerHideTimer);
         roundWinnerHideTimer = null;
@@ -1662,6 +1729,7 @@
         item.style.opacity = String(entry.opacity);
         item.style.transform = `translate(-50%, -50%) rotate(${entry.rotation}deg)`;
         item.style.setProperty("--shape-size", `${sz * 0.58}px`);
+        item.dataset.shape = entry.shape;
         mountShapeContent(item, entry.shape, "shape-photo");
         container.appendChild(item);
       });
@@ -1700,6 +1768,17 @@
         showGameView();
         renderRanking(state.leaderboard);
         setGameStatusHud(state.roundNumber, state.totalRounds, state.playerCount);
+
+        if (state.roundNumber !== roundCelebrationRound) {
+          roundCelebrationActive = false;
+          clearRoundCelebrationTimers();
+          hideRoundWinnerOverlay();
+        }
+
+        if (roundCelebrationActive && state.roundNumber === roundCelebrationRound) {
+          return;
+        }
+
         const round = state.currentRound || {};
         if (round.leftShapes?.length || round.rightShapes?.length) {
           scheduleRenderGameCircles(round.leftShapes, round.rightShapes, state.roundNumber);
@@ -1724,8 +1803,48 @@
     const roundWinnerName = document.getElementById("roundWinnerName");
     const roundWinnerRound = document.getElementById("roundWinnerRound");
     let roundWinnerHideTimer = null;
+    let roundWinnerShowTimer = null;
+    let roundCelebrationActive = false;
+    let roundCelebrationRound = 0;
+    const ROUND_WINNER_OVERLAY_DELAY_MS = 2000;
 
     document.body.appendChild(roundWinnerOverlay);
+
+    function clearRoundCelebrationTimers() {
+      if (roundWinnerShowTimer) {
+        clearTimeout(roundWinnerShowTimer);
+        roundWinnerShowTimer = null;
+      }
+    }
+
+    function revealMatchingShapesOnly(correctShape) {
+      const target = String(correctShape || "");
+      if (!target) return;
+      roundCelebrationActive = true;
+
+      for (const circleEl of [leftCircle, rightCircle]) {
+        const container = getShapesLayer(circleEl);
+        if (!container) continue;
+        container.querySelectorAll(".shape").forEach((el) => {
+          if (el.dataset.shape !== target) {
+            el.classList.add("shape-vanish");
+          }
+        });
+      }
+
+      setTimeout(() => {
+        const left = [target];
+        const right = [target];
+        lastRenderedRoundShapesKey = `win-${roundCelebrationRound}-${target}`;
+        leftCircle._shapeLayoutLocked = false;
+        rightCircle._shapeLayoutLocked = false;
+        leftCircle._shapeDisplayCache = null;
+        rightCircle._shapeDisplayCache = null;
+        lastGameCircleShapes = { left, right };
+        renderShapes(leftCircle, left);
+        renderShapes(rightCircle, right);
+      }, 300);
+    }
 
     function resolveWinner(data) {
       const incoming = data.winner || {};
@@ -1761,6 +1880,7 @@
     function hideRoundWinnerOverlay() {
       roundWinnerOverlay.classList.remove("show");
       roundWinnerOverlay.setAttribute("aria-hidden", "true");
+      clearRoundCelebrationTimers();
     }
 
     function showRoundWinnerOverlay(data) {
@@ -1785,7 +1905,6 @@
 
       roundWinnerOverlay.setAttribute("aria-hidden", "false");
       roundWinnerOverlay.classList.add("show");
-      playRoundWinSound();
 
       roundWinnerHideTimer = setTimeout(() => {
         hideRoundWinnerOverlay();
@@ -1794,11 +1913,22 @@
 
     socket.on("roundWinner", (data) => {
       if (!data || !data.winner) return;
+      roundCelebrationRound = data.roundNumber || 0;
+      clearRoundCelebrationTimers();
+      hideRoundWinnerOverlay();
+
+      playRoundWinSound();
+      revealMatchingShapesOnly(data.correctShape);
+
       if (gameStatusRound) {
         gameStatusRound.textContent = `Round ${data.roundNumber} · ${data.winner.name} wins!`;
       }
       if (gameStatusPlayers) gameStatusPlayers.hidden = true;
-      showRoundWinnerOverlay(data);
+
+      roundWinnerShowTimer = setTimeout(() => {
+        roundWinnerShowTimer = null;
+        showRoundWinnerOverlay(data);
+      }, ROUND_WINNER_OVERLAY_DELAY_MS);
     });
 
     socket.on("roundTimeout", (data) => {

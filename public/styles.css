@@ -351,7 +351,13 @@ button:disabled {
   border-radius: 0;
   padding: 0;
   background: transparent;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.28s ease;
+}
+
+.shape.shape-vanish {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.35);
+  pointer-events: none;
 }
 
 .shape:hover {
@@ -1857,6 +1863,28 @@ input::placeholder {
   align-items: center;
   gap: 0.75rem;
   margin-top: 0.75rem;
+}
+
+.clear-background-btn {
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 120, 120, 0.45);
+  background: rgba(180, 40, 40, 0.2);
+  color: #ffb4b4;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.clear-background-btn:hover:not(:disabled) {
+  background: rgba(200, 50, 50, 0.35);
+  border-color: rgba(255, 140, 140, 0.7);
+}
+
+.clear-background-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .panel-style-toggle {

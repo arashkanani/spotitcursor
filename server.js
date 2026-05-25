@@ -35,7 +35,9 @@ const io = new Server(httpServer, {
 const TOTAL_ROUNDS = 20;
 const MOBILE_SHAPES_PER_ROUND = 18;
 const MAX_PHOTO_LENGTH = 220000;
-const ROUND_WINNER_DISPLAY_MS = 4000;
+const ROUND_WINNER_OVERLAY_DELAY_MS = 2000;
+const ROUND_WINNER_OVERLAY_DURATION_MS = 4000;
+const ROUND_WINNER_DISPLAY_MS = ROUND_WINNER_OVERLAY_DELAY_MS + ROUND_WINNER_OVERLAY_DURATION_MS;
 const MISTAKES_PER_ROUND = 3;
 
 let eventConfig = eventBrandingStore.readEventConfig();
@@ -412,6 +414,19 @@ app.get("/api/event-branding", (_req, res) => {
   res.json(getEventPayload());
 });
 
+function clearStoredCustomBackgroundFiles() {
+  if (!fs.existsSync(BACKGROUNDS_DIR)) return;
+  for (const file of fs.readdirSync(BACKGROUNDS_DIR)) {
+    if (/^event-background\.(png|jpe?g|webp)$/i.test(file)) {
+      try {
+        fs.unlinkSync(path.join(BACKGROUNDS_DIR, file));
+      } catch (_error) {
+        // Ignore delete errors.
+      }
+    }
+  }
+}
+
 app.patch("/api/event-branding/theme", (req, res) => {
   const pattern = String(req.body?.themePattern || "").trim();
   const background = String(req.body?.themeBackground || "").trim();
@@ -425,15 +440,7 @@ app.patch("/api/event-branding/theme", (req, res) => {
   } else if (background && themes.isValidBackground(background) && background !== "custom") {
     eventConfig.themeBackground = background;
     eventConfig.customBackgroundUrl = null;
-    for (const file of fs.readdirSync(BACKGROUNDS_DIR)) {
-      if (/^event-background\.(png|jpe?g|webp)$/i.test(file)) {
-        try {
-          fs.unlinkSync(path.join(BACKGROUNDS_DIR, file));
-        } catch (_error) {
-          // Ignore delete errors.
-        }
-      }
-    }
+    clearStoredCustomBackgroundFiles();
   }
 
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
@@ -441,6 +448,21 @@ app.patch("/api/event-branding/theme", (req, res) => {
   io.emit("eventBranding", payload);
   res.json(payload);
 });
+
+function handleClearCustomBackground(_req, res) {
+  clearStoredCustomBackgroundFiles();
+  eventConfig.customBackgroundUrl = null;
+  if (eventConfig.themeBackground === "custom") {
+    eventConfig.themeBackground = themes.defaultBackgroundForPattern(eventConfig.themePattern);
+  }
+  eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
+  const payload = getEventPayload();
+  io.emit("eventBranding", payload);
+  res.json(payload);
+}
+
+app.post("/api/event-background/clear", handleClearCustomBackground);
+app.delete("/api/event-background", handleClearCustomBackground);
 
 app.post("/api/event-background", backgroundUpload.single("background"), (req, res) => {
   try {

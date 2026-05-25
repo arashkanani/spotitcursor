@@ -423,6 +423,10 @@
       canPickThisRound = false;
       mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}.`;
       playRoundWinSound();
+      if (data.correctShape) {
+        lastMobileShapesKey = String(data.correctShape);
+        renderShapeButtons([data.correctShape]);
+      }
     });
 
     socket.on("roundTimeout", (data) => {
