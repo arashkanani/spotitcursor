@@ -20,7 +20,7 @@
   <div class="page">
     <section id="setupView" class="host-setup">
       <div class="setup-card card">
-        <div id="patternPickerPanel" class="pattern-picker-panel">
+        <div id="patternPickerPanel" class="pattern-picker-panel hidden">
           <div class="setup-intro">
             <p class="event-eyebrow">Event planner · Start here</p>
             <h2 class="setup-title">Choose your game screen layout</h2>
@@ -30,9 +30,18 @@
           <p class="setup-hint" id="patternPickerHint">Loading layouts…</p>
         </div>
 
-        <div id="eventCustomizePanel" class="event-customize-panel hidden">
+        <div id="eventCustomizePanel" class="event-customize-panel">
+          <div class="setup-intro setup-intro-dashboard">
+            <p class="event-eyebrow">Event planner</p>
+            <h2 class="setup-title">Design your game screen</h2>
+            <p class="setup-subtitle">Set the <strong>title</strong>, <strong>background</strong>, <strong>layout</strong>, and <strong>sponsor shapes</strong>. The live preview below matches the real game.</p>
+          </div>
           <div class="customize-top-bar">
-            <button type="button" id="backToPatternsBtn" class="ghost-btn">← Change layout</button>
+            <label class="layout-pattern-field" for="layoutPatternSelect">
+              <span class="layout-pattern-label">Screen layout</span>
+              <select id="layoutPatternSelect" class="layout-pattern-select"></select>
+            </label>
+            <button type="button" id="backToPatternsBtn" class="ghost-btn hidden">More layouts</button>
             <p class="customize-pattern-badge" id="selectedPatternBadge">Classic split</p>
           </div>
 
@@ -312,6 +321,7 @@
     const patternLaunchGrid = document.getElementById("patternLaunchGrid");
     const patternPickerHint = document.getElementById("patternPickerHint");
     const backToPatternsBtn = document.getElementById("backToPatternsBtn");
+    const layoutPatternSelect = document.getElementById("layoutPatternSelect");
     const selectedPatternBadge = document.getElementById("selectedPatternBadge");
     const customBackgroundInput = document.getElementById("customBackgroundInput");
     const clearCustomBackgroundBtn = document.getElementById("clearCustomBackgroundBtn");
@@ -405,7 +415,7 @@
     let editShapeItems = [];
     let editBlobUrls = [];
     let themeCatalog = { patterns: [], backgrounds: [], presets: [] };
-    let selectedThemePattern = null;
+    let selectedThemePattern = "classic";
     let selectedThemeBackground = "midnight";
     let customBackgroundUrl = null;
     let customBackgroundPosX = 50;
@@ -415,7 +425,7 @@
     let bgAdjustPersistTimer = null;
     let circlesPanelTransparent = false;
     let rankingPanelTransparent = false;
-    let setupPhase = "patterns";
+    let setupPhase = "customize";
 
     const PATTERN_DEFAULT_BG = {
       classic: "midnight",
@@ -881,29 +891,72 @@
         eventCustomizePanel?.classList.add("hidden");
         showSponsorEditMode();
       }
-      applyCustomBackgroundTransform();
+      try {
+        applyCustomBackgroundTransform();
+      } catch (err) {
+        console.error("showSetupPhase theme apply failed", err);
+      }
     }
 
-    function enterPattern(patternId) {
+    function syncLayoutPatternSelect() {
+      if (!layoutPatternSelect) return;
+      layoutPatternSelect.value = selectedThemePattern || "classic";
+    }
+
+    function buildLayoutPatternSelect() {
+      if (!layoutPatternSelect) return;
       const patterns = getThemePatterns();
-      const pattern = patterns.find((p) => p.id === patternId);
-      if (!pattern) {
-        setupMessage.textContent = "Layout options are still loading — wait a moment and try again.";
-        return;
+      const prev = layoutPatternSelect.value || selectedThemePattern || "classic";
+      layoutPatternSelect.innerHTML = "";
+      for (const pattern of patterns) {
+        const opt = document.createElement("option");
+        opt.value = pattern.id;
+        opt.textContent = pattern.name;
+        layoutPatternSelect.appendChild(opt);
       }
+      if (!patterns.length) {
+        const opt = document.createElement("option");
+        opt.value = "classic";
+        opt.textContent = "Classic split";
+        layoutPatternSelect.appendChild(opt);
+      }
+      layoutPatternSelect.value = patterns.some((p) => p.id === prev) ? prev : "classic";
+    }
+
+    function openEventDashboard(patternId) {
+      hostPinnedView = "setup";
+      setupView?.classList.remove("hidden");
+      lobbyView?.classList.add("hidden");
+      gameView?.classList.add("hidden");
+      const pid = patternId || selectedThemePattern || "classic";
+      showSetupPhase("customize");
+      enterPattern(pid, { quiet: true });
+    }
+
+    function enterPattern(patternId, options = {}) {
+      const patterns = getThemePatterns();
+      const pattern = patterns.find((p) => p.id === patternId)
+        || { id: patternId || "classic", name: patternId || "Classic split" };
+
+      selectedThemePattern = pattern.id;
+      showSetupPhase("customize");
+      syncThemePickerUi();
+      syncLayoutPatternSelect();
 
       try {
-        const defaultBg = PATTERN_DEFAULT_BG[patternId] || "midnight";
-        applyGameTheme(patternId, defaultBg, null);
+        const defaultBg = PATTERN_DEFAULT_BG[pattern.id] || "midnight";
+        const bg = selectedThemeBackground || defaultBg;
+        const customUrl = bg === "custom" ? customBackgroundUrl : undefined;
+        applyGameTheme(pattern.id, bg, customUrl);
       } catch (err) {
         console.error("enterPattern applyGameTheme failed", err);
       }
 
-      showSetupPhase("customize");
-      syncThemePickerUi();
-      setupMessage.textContent = `Customizing “${pattern.name}” — set title, background, and sponsor shapes below.`;
-      eventCustomizePanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-      eventTitleInput?.focus();
+      if (!options.quiet) {
+        setupMessage.textContent = `Layout: ${pattern.name} — set title, background, and sponsor shapes below.`;
+        eventCustomizePanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+        eventTitleInput?.focus();
+      }
       void persistThemeSelection();
     }
 
@@ -942,13 +995,22 @@
       }
 
       buildBackgroundPicker();
+      buildLayoutPatternSelect();
       syncThemePickerUi();
+      syncLayoutPatternSelect();
     }
 
     patternLaunchGrid?.addEventListener("click", (event) => {
       const card = event.target.closest(".pattern-launch-card");
       if (!card?.dataset.pattern) return;
+      event.preventDefault();
+      event.stopPropagation();
       enterPattern(card.dataset.pattern);
+    });
+
+    layoutPatternSelect?.addEventListener("change", () => {
+      if (!layoutPatternSelect.value) return;
+      enterPattern(layoutPatternSelect.value);
     });
 
     function buildBackgroundPicker() {
@@ -1425,7 +1487,7 @@
 
     backToPatternsBtn?.addEventListener("click", () => {
       showSetupPhase("patterns");
-      setupMessage.textContent = "Pick a different game screen layout.";
+      setupMessage.textContent = "Pick a layout, or use the Screen layout menu on the design page.";
       patternLaunchGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
@@ -1604,7 +1666,7 @@
       setupView.classList.remove("hidden");
       lobbyView.classList.add("hidden");
       gameView.classList.add("hidden");
-      showSetupPhase(selectedThemePattern ? "customize" : "patterns");
+      showSetupPhase("customize");
     }
 
     function showLobbyView() {
@@ -1680,10 +1742,7 @@
 
       const title = eventTitleInput.value.trim();
       if (!selectedThemePattern) {
-        setupMessage.textContent = "Choose one of the 5 game screen layouts first.";
-        showSetupPhase("patterns");
-        patternLaunchGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
+        enterPattern("classic", { quiet: true });
       }
 
       if (!title) {
@@ -1780,24 +1839,21 @@
           presets: Array.isArray(themesData?.presets) ? themesData.presets : []
         };
         buildPatternLaunchGrid();
-        showSetupView();
         applyEventBranding(branding);
         if (canOpenLobby(branding)) {
           showLobbyView();
-        } else if (needsEventSetup(branding) || !branding?.themePattern) {
-          showSetupPhase("patterns");
         } else {
-          showSetupPhase("customize");
+          openEventDashboard(branding?.themePattern || "classic");
         }
       })
       .catch(() => {
         themeCatalog = { patterns: [], backgrounds: [], presets: [] };
         buildPatternLaunchGrid();
-        showSetupView();
-        showSetupPhase("patterns");
+        openEventDashboard("classic");
         if (patternPickerHint) {
           patternPickerHint.textContent = "Could not reach the server. Start it with npm start, then refresh.";
         }
+        setupMessage.textContent = "Server offline — start with npm start, then refresh. You can still edit the form below.";
       });
 
     fetch("/api/join-info")

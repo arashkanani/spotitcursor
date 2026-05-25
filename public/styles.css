@@ -1829,9 +1829,50 @@ input::placeholder {
   margin-top: 0.5rem;
 }
 
+.setup-intro-dashboard {
+  margin-bottom: 1rem;
+}
+
+.layout-pattern-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 200px;
+  flex: 1;
+}
+
+.layout-pattern-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.layout-pattern-select {
+  width: 100%;
+  max-width: 280px;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.layout-pattern-select:focus {
+  outline: none;
+  border-color: rgba(92, 225, 230, 0.55);
+  box-shadow: 0 0 0 2px rgba(92, 225, 230, 0.2);
+}
+
 .customize-top-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
@@ -1839,6 +1880,7 @@ input::placeholder {
 }
 
 .customize-pattern-badge {
+  display: none;
   margin: 0;
   padding: 0.45rem 0.9rem;
   border-radius: 999px;
