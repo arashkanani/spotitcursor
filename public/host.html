@@ -89,53 +89,44 @@
             </div>
           </div>
 
-          <p class="setup-preview-label">Live demo — your game screen</p>
-          <div id="setupLiveDemo" class="setup-live-demo card">
-            <header class="event-branding-bar setup-preview-bar">
-              <div class="event-branding-main">
-                <p class="event-eyebrow">Live Event</p>
-                <h2 class="event-title" data-event-title>Your Event Title</h2>
-                <p class="event-sponsor-line" data-event-sponsor hidden></p>
-              </div>
-              <div class="round-pill game-status-pill demo-status-pill">
-                <span class="game-status-round">Round 3 / 20</span>
-                <span class="game-status-players">24 players</span>
-              </div>
-            </header>
-            <div class="demo-game-shell">
-              <div class="demo-game-board card">
-                <div class="circles demo-circles">
-                  <div class="circle demo-circle" id="demoLeftCircle">
-                    <div class="circle-shapes-layer"></div>
-                  </div>
-                  <div class="circle demo-circle" id="demoRightCircle">
-                    <div class="circle-shapes-layer"></div>
+          <p class="setup-preview-label">Live preview — background, circles &amp; ranking</p>
+          <div id="setupLiveDemo" class="setup-live-demo setup-game-preview-panel card" data-bg="midnight" data-pattern="classic">
+            <div class="setup-preview-bg bg-mesh" aria-hidden="true"></div>
+            <div class="setup-preview-vignette" aria-hidden="true"></div>
+            <div class="setup-preview-content">
+              <header class="event-branding-bar setup-preview-bar">
+                <div class="event-branding-main">
+                  <p class="event-eyebrow">Live Event</p>
+                  <h2 class="event-title" data-event-title>Your Event Title</h2>
+                  <p class="event-sponsor-line" data-event-sponsor hidden></p>
+                </div>
+                <div class="round-pill game-status-pill demo-status-pill">
+                  <span class="game-status-round">Round 3 / 20</span>
+                  <span class="game-status-players">24 players</span>
+                </div>
+              </header>
+              <div class="demo-game-shell">
+                <div class="demo-game-board card">
+                  <div class="circles demo-circles">
+                    <div class="circle demo-circle" id="demoLeftCircle">
+                      <div class="circle-shapes-layer"></div>
+                    </div>
+                    <div class="circle demo-circle" id="demoRightCircle">
+                      <div class="circle-shapes-layer"></div>
+                    </div>
                   </div>
                 </div>
+                <aside class="card demo-leaderboard">
+                  <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
+                  <ul class="rank-list demo-rank-list">
+                    <li class="rank-item"><div class="leaderboard-row rank-first"><div class="rank-badge"><span class="rank-medal">🥇</span></div><div class="rank-player"><span class="player-name">Alex</span></div><div class="rank-score"><span class="rank-score-num">5</span></div></div></li>
+                    <li class="rank-item"><div class="leaderboard-row"><div class="rank-badge"><span class="rank-num">2</span></div><div class="rank-player"><span class="player-name">Sam</span></div><div class="rank-score"><span class="rank-score-num">4</span></div></div></li>
+                  </ul>
+                </aside>
               </div>
-              <aside class="card demo-leaderboard">
-                <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
-                <ul class="rank-list demo-rank-list">
-                  <li class="rank-item"><div class="leaderboard-row rank-first"><div class="rank-badge"><span class="rank-medal">🥇</span></div><div class="rank-player"><span class="player-name">Alex</span></div><div class="rank-score"><span class="rank-score-num">5</span></div></div></li>
-                  <li class="rank-item"><div class="leaderboard-row"><div class="rank-badge"><span class="rank-num">2</span></div><div class="rank-player"><span class="player-name">Sam</span></div><div class="rank-score"><span class="rank-score-num">4</span></div></div></li>
-                </ul>
-              </aside>
             </div>
-          </div>
-
-          <div id="customBackgroundAdjustSection" class="custom-bg-adjust-section hidden">
-            <p class="setup-preview-label">Background — position &amp; zoom (live)</p>
-            <div
-              id="backgroundAdjustPreview"
-              class="background-adjust-preview"
-              data-bg="midnight"
-              data-pattern="classic"
-              aria-label="Live background preview"
-            >
-              <div class="background-adjust-preview-mesh bg-mesh" aria-hidden="true"></div>
-              <p class="background-adjust-preview-caption">What players see behind the game — adjust with sliders below</p>
-            </div>
-            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls">
+            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls hidden">
+              <p class="custom-bg-adjust-hint">Adjust your uploaded background — preview updates above with circles and ranking.</p>
               <div class="custom-bg-adjust-row">
                 <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
                 <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
@@ -319,8 +310,6 @@
     const selectedPatternBadge = document.getElementById("selectedPatternBadge");
     const customBackgroundInput = document.getElementById("customBackgroundInput");
     const clearCustomBackgroundBtn = document.getElementById("clearCustomBackgroundBtn");
-    const customBackgroundAdjustSection = document.getElementById("customBackgroundAdjustSection");
-    const backgroundAdjustPreview = document.getElementById("backgroundAdjustPreview");
     const customBackgroundAdjustPanel = document.getElementById("customBackgroundAdjustPanel");
     const bgPosXInput = document.getElementById("bgPosX");
     const bgPosYInput = document.getElementById("bgPosY");
@@ -471,8 +460,8 @@
 
     function updateCustomBackgroundAdjustPanel() {
       const show = selectedThemeBackground === "custom" && !!customBackgroundUrl;
-      if (customBackgroundAdjustSection) {
-        customBackgroundAdjustSection.classList.toggle("hidden", !show);
+      if (customBackgroundAdjustPanel) {
+        customBackgroundAdjustPanel.classList.toggle("hidden", !show);
       }
       document.body.classList.toggle("host-editing-custom-bg", show && isSetupCustomizeView());
     }
@@ -483,14 +472,7 @@
         targets.push(document.documentElement, document.body);
       }
       if (setupLiveDemo) targets.push(setupLiveDemo);
-      if (backgroundAdjustPreview) targets.push(backgroundAdjustPreview);
       return targets;
-    }
-
-    function syncBackgroundAdjustPreviewDataset() {
-      if (!backgroundAdjustPreview) return;
-      backgroundAdjustPreview.dataset.pattern = selectedThemePattern || "classic";
-      backgroundAdjustPreview.dataset.bg = selectedThemeBackground || "midnight";
     }
 
     function applyCustomBackgroundTransform() {
@@ -518,7 +500,6 @@
         document.body.style.removeProperty("--custom-bg-size");
       }
 
-      syncBackgroundAdjustPreviewDataset();
       updateCustomBackgroundAdjustPanel();
     }
 
@@ -591,7 +572,7 @@
           cacheVersion || null
         );
         const urlValue = `url("${bustUrl}")`;
-        const previewTargets = [setupLiveDemo, backgroundAdjustPreview].filter(Boolean);
+        const previewTargets = setupLiveDemo ? [setupLiveDemo] : [];
         if (!editingInDashboard) {
           previewTargets.unshift(document.documentElement, document.body);
         }
@@ -604,19 +585,16 @@
         layer.style.removeProperty("background");
         layer.style.removeProperty("background-image");
       });
-      if (backgroundAdjustPreview) {
-        const previewMesh = backgroundAdjustPreview.querySelector(".bg-mesh");
-        if (previewMesh) {
-          previewMesh.style.removeProperty("background");
-          previewMesh.style.removeProperty("background-image");
-        }
+      const setupPreviewMesh = setupLiveDemo?.querySelector(".setup-preview-bg");
+      if (setupPreviewMesh) {
+        setupPreviewMesh.style.removeProperty("background");
+        setupPreviewMesh.style.removeProperty("background-image");
       }
 
       if (setupLiveDemo) {
         setupLiveDemo.dataset.pattern = selectedThemePattern || "classic";
         setupLiveDemo.dataset.bg = selectedThemeBackground;
       }
-      syncBackgroundAdjustPreviewDataset();
 
       if (selectedPatternBadge && selectedThemePattern) {
         const p = themeCatalog.patterns.find((x) => x.id === selectedThemePattern);
@@ -1325,7 +1303,7 @@
         if (customBackgroundStatus) customBackgroundStatus.textContent = "Custom background applied.";
         updateClearBackgroundButton();
         updateSetupPreview();
-        customBackgroundAdjustSection?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        setupLiveDemo?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } catch (err) {
         if (customBackgroundStatus) customBackgroundStatus.textContent = err.message || "Could not upload.";
       }

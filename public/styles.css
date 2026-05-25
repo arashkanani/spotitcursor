@@ -1887,54 +1887,53 @@ input::placeholder {
   cursor: wait;
 }
 
-.custom-bg-adjust-section {
-  margin-top: 1.25rem;
-  padding-top: 0.25rem;
-}
-
-.custom-bg-adjust-section.hidden {
-  display: none;
-}
-
-.background-adjust-preview {
+.setup-game-preview-panel {
   position: relative;
-  width: 100%;
-  height: min(36vw, 300px);
-  min-height: 220px;
-  margin: 0 0 1rem;
-  border-radius: var(--radius-md);
   overflow: hidden;
-  border: 1px solid var(--border-glass);
-  background: #060912;
-  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.35);
+  padding: 0;
 }
 
-.background-adjust-preview .background-adjust-preview-mesh {
+.setup-game-preview-panel .setup-preview-bg {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
 }
 
-.background-adjust-preview-caption {
+.setup-game-preview-panel .setup-preview-vignette {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  margin: 0;
-  padding: 0.65rem 0.85rem;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.88);
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.72));
+  inset: 0;
+  z-index: 0;
   pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.5) 100%);
 }
 
-.custom-bg-adjust-controls {
+.setup-game-preview-panel .setup-preview-content {
+  position: relative;
+  z-index: 1;
+  padding: 1rem;
+}
+
+.setup-game-preview-panel .custom-bg-adjust-controls {
+  position: relative;
+  z-index: 2;
+  margin: 0;
   padding: 1rem 1.1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-glass);
-  background: rgba(0, 0, 0, 0.28);
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--border-glass);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.setup-game-preview-panel .custom-bg-adjust-controls.hidden {
+  display: none;
+}
+
+.custom-bg-adjust-hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
 body.host-editing-custom-bg > .bg-mesh {
@@ -2183,7 +2182,7 @@ body[data-bg="custom"] .bg-mesh,
 .pattern-thumb-wide { background: linear-gradient(180deg, rgba(255,255,255,0.15) 0 55%, transparent 55%); }
 .pattern-thumb-cinema { box-shadow: inset 0 0 0 2px rgba(240, 193, 77, 0.45); }
 
-.setup-live-demo {
+.setup-live-demo:not(.setup-game-preview-panel) {
   padding: 1rem;
   overflow: hidden;
 }
