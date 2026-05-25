@@ -2191,34 +2191,37 @@ body[data-bg="custom"] .bg-mesh,
   margin-bottom: 0.85rem;
 }
 
-.demo-status-pill {
-  transform: scale(0.82);
-  transform-origin: top right;
+.setup-game-preview-panel {
+  --preview-circle-size: min(34vw, 38vh, 300px);
 }
 
-.demo-game-shell {
+.setup-game-preview-panel .layout {
   display: grid;
-  grid-template-columns: 1fr minmax(200px, 280px);
-  gap: 1rem;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.25rem;
   align-items: start;
 }
 
-.demo-game-board {
+.setup-game-preview-panel .game-board-card {
   padding: 0.85rem;
 }
 
-.demo-circles .demo-circle {
-  width: min(28vw, 200px);
-  height: min(28vw, 200px);
+.setup-game-preview-panel .circle {
+  width: var(--preview-circle-size);
+  height: var(--preview-circle-size);
+  min-width: 0;
+  min-height: 0;
+  margin: 0 auto;
+  aspect-ratio: 1;
 }
 
-.demo-leaderboard {
+.setup-game-preview-panel .leaderboard-panel {
   padding: 0.75rem;
   min-height: 180px;
 }
 
-.demo-rank-list {
-  max-height: 140px;
+.setup-game-preview-panel .demo-rank-list {
+  max-height: calc(var(--preview-circle-size) * 0.85);
 }
 
 /* Background themes */
@@ -2278,57 +2281,48 @@ body[data-bg="royal"] .orb-1 { background: radial-gradient(circle, rgba(167, 139
 
 /* Layout patterns — game + live demo */
 body[data-pattern="spotlight"] .host-game .layout,
-body[data-pattern="spotlight"] .setup-live-demo .demo-game-shell,
-[data-pattern="spotlight"] .demo-game-shell {
+body[data-pattern="spotlight"] .setup-game-preview-panel .layout {
   grid-template-columns: 1fr minmax(180px, 220px);
 }
 
 body[data-pattern="spotlight"] .host-game .circle,
-body[data-pattern="spotlight"] .setup-live-demo .demo-circle,
-[data-pattern="spotlight"] .demo-circle {
-  width: min(48vw, 52vh, 520px);
-  height: min(48vw, 52vh, 520px);
+body[data-pattern="spotlight"] .setup-game-preview-panel {
+  --preview-circle-size: min(36vw, 40vh, 320px);
 }
 
 body[data-pattern="stage"] .host-game .layout,
-body[data-pattern="stage"] .setup-live-demo .demo-game-shell,
-[data-pattern="stage"] .demo-game-shell {
+body[data-pattern="stage"] .setup-game-preview-panel .layout {
   grid-template-columns: 1fr;
   max-width: 720px;
   margin: 0 auto;
 }
 
 body[data-pattern="stage"] .host-game .circles,
-body[data-pattern="stage"] .setup-live-demo .demo-circles,
-[data-pattern="stage"] .demo-circles {
+body[data-pattern="stage"] .setup-game-preview-panel .circles {
   grid-template-columns: 1fr;
   justify-items: center;
   gap: 1.5rem;
 }
 
 body[data-pattern="wide"] .host-game .layout,
-body[data-pattern="wide"] .setup-live-demo .demo-game-shell,
-[data-pattern="wide"] .demo-game-shell {
+body[data-pattern="wide"] .setup-game-preview-panel .layout {
   grid-template-columns: 1fr;
 }
 
 body[data-pattern="wide"] .host-game .leaderboard-panel,
-body[data-pattern="wide"] .setup-live-demo .demo-leaderboard,
-[data-pattern="wide"] .demo-leaderboard {
+body[data-pattern="wide"] .setup-game-preview-panel .leaderboard-panel {
   max-width: none;
 }
 
 body[data-pattern="wide"] .host-game .circles,
-body[data-pattern="wide"] .setup-live-demo .demo-circles,
-[data-pattern="wide"] .demo-circles {
+body[data-pattern="wide"] .setup-game-preview-panel .circles {
   grid-template-columns: 1fr 1fr;
   max-width: 900px;
   margin: 0 auto;
 }
 
 body[data-pattern="cinema"] .host-game .circle,
-body[data-pattern="cinema"] .setup-live-demo .demo-circle,
-[data-pattern="cinema"] .demo-circle {
+body[data-pattern="cinema"] .setup-game-preview-panel .circle {
   border-width: 3px;
   border-color: rgba(240, 193, 77, 0.55);
   box-shadow:

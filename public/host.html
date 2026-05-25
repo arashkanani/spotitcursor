@@ -105,18 +105,18 @@
                   <span class="game-status-players">24 players</span>
                 </div>
               </header>
-              <div class="demo-game-shell">
-                <div class="demo-game-board card">
-                  <div class="circles demo-circles">
-                    <div class="circle demo-circle" id="demoLeftCircle">
+              <div class="demo-game-shell layout">
+                <section class="demo-game-board game-board-card card">
+                  <div class="circles">
+                    <div class="circle" id="demoLeftCircle">
                       <div class="circle-shapes-layer"></div>
                     </div>
-                    <div class="circle demo-circle" id="demoRightCircle">
+                    <div class="circle" id="demoRightCircle">
                       <div class="circle-shapes-layer"></div>
                     </div>
                   </div>
-                </div>
-                <aside class="card demo-leaderboard">
+                </section>
+                <aside class="card demo-leaderboard leaderboard-panel">
                   <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
                   <ul class="rank-list demo-rank-list">
                     <li class="rank-item"><div class="leaderboard-row rank-first"><div class="rank-badge"><span class="rank-medal">🥇</span></div><div class="rank-player"><span class="player-name">Alex</span></div><div class="rank-score"><span class="rank-score-num">5</span></div></div></li>
@@ -1762,6 +1762,14 @@
       return tokens;
     }
 
+    function isDemoCircleEl(circleEl) {
+      return circleEl?.id === "demoLeftCircle" || circleEl?.id === "demoRightCircle";
+    }
+
+    function shapeIconScale(entry) {
+      return entry?.iconScale ?? 0.58;
+    }
+
     function getShapesLayer(circleEl) {
       return circleEl.querySelector(".circle-shapes-layer");
     }
@@ -1840,7 +1848,7 @@
         item.style.top = `${entry.normY * size}px`;
         item.style.width = `${sz}px`;
         item.style.height = `${sz}px`;
-        item.style.setProperty("--shape-size", `${sz * 0.58}px`);
+        item.style.setProperty("--shape-size", `${sz * shapeIconScale(entry)}px`);
       });
     }
 
@@ -1910,6 +1918,7 @@
       const maxSize = size * 0.2;
       const layout = ensureShapeLayout(list.length, radius, minSize, maxSize, layoutSeed);
       const seed = hashString(layoutSeed);
+      const uniformDemo = isDemoCircleEl(circleEl);
       const items = list.map((shape, index) => {
         const slot = layout[index];
         if (!slot) return null;
@@ -1918,8 +1927,9 @@
           normX: slot.x / size,
           normY: slot.y / size,
           relSize: slot.size / size,
-          opacity: 0.45 + seededUnit(seed, 40 + index) * 0.5,
-          rotation: seededUnit(seed, 50 + index) * 56 - 28
+          opacity: uniformDemo ? 1 : 0.45 + seededUnit(seed, 40 + index) * 0.5,
+          rotation: uniformDemo ? 0 : seededUnit(seed, 50 + index) * 56 - 28,
+          iconScale: uniformDemo ? 0.62 : 0.58
         };
       }).filter(Boolean);
 
@@ -1962,7 +1972,7 @@
         item.style.height = `${sz}px`;
         item.style.opacity = String(entry.opacity);
         item.style.transform = `translate(-50%, -50%) rotate(${entry.rotation}deg)`;
-        item.style.setProperty("--shape-size", `${sz * 0.58}px`);
+        item.style.setProperty("--shape-size", `${sz * shapeIconScale(entry)}px`);
         item.dataset.shape = entry.shape;
         mountShapeContent(item, entry.shape, "shape-photo");
         container.appendChild(item);
