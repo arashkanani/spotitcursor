@@ -90,15 +90,33 @@
         const posX = Math.min(150, Math.max(-50, Number(branding?.customBackgroundPosX) || 50));
         const posY = Math.min(150, Math.max(-50, Number(branding?.customBackgroundPosY) || 50));
         const scale = Math.min(500, Math.max(25, Number(branding?.customBackgroundScale) || 100));
-        document.body.style.setProperty("--custom-bg-url", `url("${base}?v=${v}")`);
+        const bust = `${base}?v=${v}`;
+        document.body.style.setProperty("--custom-bg-url", `url("${bust}")`);
         document.body.style.setProperty("--custom-bg-pos-x", `${posX}%`);
         document.body.style.setProperty("--custom-bg-pos-y", `${posY}%`);
         document.body.style.setProperty("--custom-bg-size", `${scale}% auto`);
+        const mesh = document.querySelector("body > .bg-mesh");
+        if (mesh) {
+          mesh.style.backgroundColor = "transparent";
+          mesh.style.backgroundImage = `url("${bust}")`;
+          mesh.style.backgroundPosition = `${posX}% ${posY}%`;
+          mesh.style.backgroundSize = `${scale}% auto`;
+          mesh.style.backgroundRepeat = "no-repeat";
+        }
       } else {
         document.body.style.removeProperty("--custom-bg-url");
         document.body.style.removeProperty("--custom-bg-pos-x");
         document.body.style.removeProperty("--custom-bg-pos-y");
         document.body.style.removeProperty("--custom-bg-size");
+        const mesh = document.querySelector("body > .bg-mesh");
+        if (mesh) {
+          mesh.style.removeProperty("background");
+          mesh.style.removeProperty("background-image");
+          mesh.style.removeProperty("background-position");
+          mesh.style.removeProperty("background-size");
+          mesh.style.removeProperty("background-repeat");
+          mesh.style.removeProperty("background-color");
+        }
       }
     }
     let joined = false;

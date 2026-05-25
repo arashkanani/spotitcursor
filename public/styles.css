@@ -2090,12 +2090,57 @@ body[data-ranking-panel="transparent"] .leaderboard-panel .rank-list {
   background: rgba(92, 225, 230, 0.12);
 }
 
+body[data-bg="custom"] {
+  background: linear-gradient(165deg, #1a2744 0%, #101828 45%, #0a1020 100%);
+}
+
 body[data-bg="custom"] .bg-mesh,
 [data-bg="custom"] .bg-mesh {
+  background: none;
+  background-color: transparent;
+}
+
+body[data-bg="custom"] .bg-vignette,
+[data-bg="custom"] .setup-preview-vignette {
+  opacity: 0;
+}
+
+body[data-bg="custom"] .bg-orb,
+body[data-bg="custom"] .bg-sparkle {
+  opacity: 0;
+}
+
+#setupPreviewScene[data-bg="custom"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.45;
   background:
-    linear-gradient(165deg, rgba(6, 9, 18, 0.72) 0%, rgba(6, 9, 18, 0.55) 100%),
-    var(--custom-bg-url, none) var(--custom-bg-pos-x, 50%) var(--custom-bg-pos-y, 50%) / var(--custom-bg-size, cover) no-repeat,
-    #060912;
+    repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0% 25%, transparent 0% 50%) 50% / 20px 20px,
+    linear-gradient(165deg, #1e2d4a 0%, #121c30 100%);
+}
+
+.setup-game-preview-panel .setup-preview-viewport:has([data-bg="custom"]) {
+  background: #121c30;
+}
+
+.setup-game-preview-panel .setup-preview-bg.bg-mesh {
+  z-index: 1;
+}
+
+.theme-bg-swatch-custom {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: transparent;
+}
+
+.custom-upload-hint {
+  display: block;
+  margin-top: 0.35rem;
+  max-width: 42rem;
 }
 
 .design-studio-panel {

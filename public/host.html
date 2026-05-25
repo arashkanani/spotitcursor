@@ -47,6 +47,7 @@
             <div id="backgroundPicker" class="theme-option-grid theme-bg-grid" role="listbox" aria-label="Background"></div>
             <div class="background-upload-row">
               <label class="photo-upload-btn" for="customBackgroundInput">Upload custom background</label>
+              <span class="setup-hint custom-upload-hint">PNG with transparent areas works best. Solid black fills may blend into the dark screen — increase zoom or use a cut-out PNG.</span>
               <button type="button" id="clearCustomBackgroundBtn" class="clear-background-btn" hidden>
                 Remove upload
               </button>
@@ -530,8 +531,7 @@
         setupPreviewScene.style.removeProperty("--custom-bg-pos-x");
         setupPreviewScene.style.removeProperty("--custom-bg-pos-y");
         setupPreviewScene.style.removeProperty("--custom-bg-size");
-        mesh.style.removeProperty("background");
-        mesh.style.removeProperty("background-image");
+        clearCustomBgMesh(mesh);
         return;
       }
 
@@ -542,8 +542,7 @@
       setupPreviewScene.style.setProperty("--custom-bg-pos-y", `${customBackgroundPosY}%`);
       setupPreviewScene.style.setProperty("--custom-bg-size", `${customBackgroundScale}% auto`);
 
-      mesh.style.removeProperty("background");
-      mesh.style.removeProperty("background-image");
+      paintCustomBgMesh(mesh, bustUrl);
     }
 
     function applyCustomBackgroundTransform() {
@@ -579,9 +578,13 @@
 
       if (isCustom) {
         applyPreviewBackgroundLayer();
+        paintAllCustomBackgroundMeshes();
+      } else {
+        paintAllCustomBackgroundMeshes();
       }
 
       updateCustomBackgroundAdjustPanel();
+      updateCustomUploadSwatch();
     }
 
     function setBackgroundTransform(transform, options = {}) {
@@ -615,6 +618,46 @@
         ? new Date(cacheVersion).getTime()
         : Date.now();
       return `${base}?v=${v}`;
+    }
+
+    function clearCustomBgMesh(mesh) {
+      if (!mesh) return;
+      mesh.style.removeProperty("background");
+      mesh.style.removeProperty("background-image");
+      mesh.style.removeProperty("background-position");
+      mesh.style.removeProperty("background-size");
+      mesh.style.removeProperty("background-repeat");
+      mesh.style.removeProperty("background-color");
+    }
+
+    function paintCustomBgMesh(mesh, bustUrl) {
+      if (!mesh || !bustUrl) return;
+      const pos = `${customBackgroundPosX}% ${customBackgroundPosY}%`;
+      const size = `${customBackgroundScale}% auto`;
+      mesh.style.backgroundColor = "transparent";
+      mesh.style.backgroundImage = `url("${bustUrl}")`;
+      mesh.style.backgroundPosition = pos;
+      mesh.style.backgroundSize = size;
+      mesh.style.backgroundRepeat = "no-repeat";
+    }
+
+    function paintAllCustomBackgroundMeshes(cacheVersion) {
+      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const bustUrl = isCustom
+        ? customBgDisplayUrl(customBackgroundUrl, cacheVersion ?? previewBgCacheVersion)
+        : null;
+      const editingInDashboard = isSetupCustomizeView() && isCustom;
+
+      if (!isCustom || !bustUrl) {
+        document.querySelectorAll("body > .bg-mesh, .setup-preview-bg").forEach(clearCustomBgMesh);
+        return;
+      }
+
+      if (!editingInDashboard) {
+        document.querySelectorAll("body > .bg-mesh").forEach((mesh) => paintCustomBgMesh(mesh, bustUrl));
+      }
+      const previewMesh = setupPreviewScene?.querySelector(".setup-preview-bg");
+      paintCustomBgMesh(previewMesh, bustUrl);
     }
 
     function applyGameTheme(pattern, background, customUrl, cacheVersion) {
@@ -666,15 +709,12 @@
         }
       }
 
-      document.querySelectorAll("body > .bg-mesh").forEach((layer) => {
-        layer.style.removeProperty("background");
-        layer.style.removeProperty("background-image");
-      });
-
       if (setupLiveDemo) {
         setupLiveDemo.dataset.pattern = selectedThemePattern || "classic";
+        setupLiveDemo.dataset.bg = isCustom ? "custom" : (selectedThemeBackground || "midnight");
       }
       applyPreviewBackgroundLayer(cacheVersion || previewBgCacheVersion);
+      paintAllCustomBackgroundMeshes(cacheVersion || previewBgCacheVersion);
       fitSetupPreviewScale();
 
       if (selectedPatternBadge && selectedThemePattern) {
@@ -685,6 +725,7 @@
       applyCustomBackgroundTransform();
       syncThemePickerUi();
       updateClearBackgroundButton();
+      updateCustomUploadSwatch();
     }
 
     function updateClearBackgroundButton() {
@@ -912,6 +953,7 @@
       backgroundPicker.appendChild(customBtn);
 
       syncThemePickerUi();
+      updateCustomUploadSwatch();
     }
 
     async function refreshSetupLiveDemo() {
@@ -1383,7 +1425,15 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Upload failed");
         applyEventBranding(data);
-        if (customBackgroundStatus) customBackgroundStatus.textContent = "Custom background applied.";
+        applyGameTheme(
+          data.themePattern || selectedThemePattern,
+          "custom",
+          data.customBackgroundUrl,
+          data.updatedAt || null
+        );
+        if (customBackgroundStatus) {
+          customBackgroundStatus.textContent = "Custom background applied — use the sliders below if it looks too small or off-center.";
+        }
         updateClearBackgroundButton();
         updateSetupPreview();
         setupLiveDemo?.scrollIntoView({ behavior: "smooth", block: "nearest" });
