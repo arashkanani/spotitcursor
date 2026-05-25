@@ -95,7 +95,7 @@
               <div id="setupPreviewScene" class="setup-preview-scene" data-bg="midnight" data-pattern="classic">
                 <div class="setup-preview-bg bg-mesh" aria-hidden="true"></div>
                 <div class="setup-preview-vignette" aria-hidden="true"></div>
-                <div class="setup-preview-scale">
+                <div class="setup-preview-inner page host-game">
                   <header class="event-branding-bar setup-preview-bar game-branding-bar">
                     <div class="event-branding-main">
                       <p class="event-eyebrow">Live Event</p>
@@ -130,7 +130,7 @@
               </div>
             </div>
             <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls hidden">
-              <p class="custom-bg-adjust-hint">Adjust position and zoom — the miniature game view above shows how the background sits behind the title, circles, and ranking.</p>
+              <p class="custom-bg-adjust-hint">Adjust position and zoom — the preview above is a scaled copy of the live game screen (same size as your display, shown at ¼ scale).</p>
               <div class="custom-bg-adjust-row">
                 <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
                 <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
@@ -348,9 +348,8 @@
     const setupLiveDemo = document.getElementById("setupLiveDemo");
     const setupPreviewScene = document.getElementById("setupPreviewScene");
     const setupPreviewViewport = setupLiveDemo?.querySelector(".setup-preview-viewport");
-    const setupPreviewScaleEl = setupLiveDemo?.querySelector(".setup-preview-scale");
-    const SETUP_PREVIEW_REF_WIDTH = 1080;
-    const SETUP_PREVIEW_REF_HEIGHT = 620;
+    const SETUP_PREVIEW_SCALE_TARGET = 0.25;
+    const SETUP_PREVIEW_SCALE_MAX = 0.5;
     const demoLeftCircle = document.getElementById("demoLeftCircle");
     const demoRightCircle = document.getElementById("demoRightCircle");
     const setupMessage = document.getElementById("setupMessage");
@@ -485,22 +484,37 @@
       return targets;
     }
 
+    function getSetupPreviewReferenceSize() {
+      const width = Math.round(window.innerWidth || 1920);
+      const height = Math.round(window.innerHeight || 1080);
+      return {
+        width: Math.max(960, width),
+        height: Math.max(540, height)
+      };
+    }
+
     function fitSetupPreviewScale() {
-      if (!setupPreviewViewport || !setupPreviewScaleEl) return;
-      const width = setupPreviewViewport.clientWidth;
-      if (width < 16) return;
+      if (!setupPreviewViewport || !setupPreviewScene) return;
+      const ref = getSetupPreviewReferenceSize();
+      setupPreviewScene.style.width = `${ref.width}px`;
+      setupPreviewScene.style.height = `${ref.height}px`;
+
+      const panelWidth = setupPreviewViewport.clientWidth;
+      if (panelWidth < 16) return;
       const heightBudget = Math.min(
-        Math.max(240, window.innerHeight * 0.42),
-        400
+        Math.max(200, window.innerHeight * 0.38),
+        380
       );
-      const scale = Math.min(
-        width / SETUP_PREVIEW_REF_WIDTH,
-        heightBudget / SETUP_PREVIEW_REF_HEIGHT,
-        0.58
+      const scaleToFit = Math.min(
+        panelWidth / ref.width,
+        heightBudget / ref.height
       );
-      const fit = Math.max(0.34, scale);
-      setupPreviewScaleEl.style.setProperty("--preview-fit-scale", String(fit));
-      setupPreviewViewport.style.height = `${Math.ceil(SETUP_PREVIEW_REF_HEIGHT * fit)}px`;
+      const fit = Math.max(
+        0.18,
+        Math.min(SETUP_PREVIEW_SCALE_MAX, SETUP_PREVIEW_SCALE_TARGET, scaleToFit)
+      );
+      setupPreviewScene.style.setProperty("--preview-fit-scale", String(fit));
+      setupPreviewViewport.style.height = `${Math.ceil(ref.height * fit)}px`;
     }
 
     function applyPreviewBackgroundLayer(cacheVersion) {
@@ -528,11 +542,8 @@
       setupPreviewScene.style.setProperty("--custom-bg-pos-y", `${customBackgroundPosY}%`);
       setupPreviewScene.style.setProperty("--custom-bg-size", `${customBackgroundScale}% auto`);
 
-      mesh.style.background = [
-        "linear-gradient(165deg, rgba(6, 9, 18, 0.72) 0%, rgba(6, 9, 18, 0.55) 100%)",
-        `${urlValue} ${customBackgroundPosX}% ${customBackgroundPosY}% / ${customBackgroundScale}% auto no-repeat`,
-        "#060912"
-      ].join(", ");
+      mesh.style.removeProperty("background");
+      mesh.style.removeProperty("background-image");
     }
 
     function applyCustomBackgroundTransform() {
@@ -2274,6 +2285,9 @@
     window.addEventListener("resize", () => {
       if (!setupView.classList.contains("hidden")) {
         fitSetupPreviewScale();
+        if (isSetupCustomizeView() && selectedThemeBackground === "custom" && customBackgroundUrl) {
+          applyPreviewBackgroundLayer();
+        }
       }
       if (gameView.classList.contains("hidden")) return;
       if (!lastGameCircleShapes.left.length && !lastGameCircleShapes.right.length) return;

@@ -1898,15 +1898,22 @@ input::placeholder {
   width: 100%;
   overflow: hidden;
   background: #060912;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 .setup-game-preview-panel .setup-preview-scene {
-  position: absolute;
-  inset: 0;
+  --preview-fit-scale: 0.25;
+  position: relative;
+  flex-shrink: 0;
   overflow: hidden;
+  container-type: size;
+  transform: scale(var(--preview-fit-scale));
+  transform-origin: top center;
 }
 
-.setup-game-preview-panel .setup-preview-bg {
+.setup-game-preview-panel .setup-preview-bg.bg-mesh {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -1918,58 +1925,36 @@ input::placeholder {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.5) 100%);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.55) 100%);
 }
 
-.setup-game-preview-panel .setup-preview-scale {
-  --preview-fit-scale: 0.46;
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 1080px;
-  min-height: 620px;
-  padding: 0.6rem 0.85rem 0.85rem;
-  box-sizing: border-box;
-  transform: translateX(-50%) scale(var(--preview-fit-scale));
-  transform-origin: top center;
+.setup-game-preview-panel .setup-preview-inner {
+  position: relative;
   z-index: 1;
+  min-height: 100%;
+  box-sizing: border-box;
 }
 
-.setup-game-preview-panel .setup-preview-scale .setup-preview-bar {
-  margin-bottom: 0.55rem;
+.setup-game-preview-panel .setup-preview-inner.host-game {
+  min-height: 100%;
 }
 
-.setup-game-preview-panel .setup-preview-scale .event-title {
-  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+.setup-game-preview-panel .setup-preview-inner .layout {
+  flex: 1;
+  align-content: start;
 }
 
-.setup-game-preview-panel .setup-preview-scale .layout {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 1rem;
-  align-items: start;
-}
-
-.setup-game-preview-panel .setup-preview-scale .game-board-card {
-  padding: 0.75rem;
-}
-
-.setup-game-preview-panel .setup-preview-scale .circle {
-  width: 240px;
-  height: 240px;
-  min-width: 0;
-  min-height: 0;
-  margin: 0 auto;
+.setup-game-preview-panel .setup-preview-inner .circle {
+  width: min(44cqw, 45cqh, 480px);
+  height: min(44cqw, 45cqh, 480px);
   aspect-ratio: 1;
+  min-width: 240px;
+  min-height: 240px;
+  margin: 0 auto;
 }
 
-.setup-game-preview-panel .setup-preview-scale .leaderboard-panel {
-  padding: 0.65rem;
-  min-height: 160px;
-}
-
-.setup-game-preview-panel .setup-preview-scale .demo-rank-list {
-  max-height: 200px;
+.setup-game-preview-panel .setup-preview-inner .demo-rank-list {
+  max-height: min(36cqh, 320px);
 }
 
 .setup-game-preview-panel .custom-bg-adjust-controls {
@@ -2073,7 +2058,7 @@ body.host-editing-custom-bg > .bg-vignette {
 }
 
 body[data-circles-panel="transparent"] .game-board-card,
-body[data-circles-panel="transparent"] .setup-preview-scale .game-board-card,
+body[data-circles-panel="transparent"] .setup-preview-inner .game-board-card,
 [data-circles-panel="transparent"] .demo-game-board {
   background: transparent;
   border-color: transparent;
@@ -2083,7 +2068,7 @@ body[data-circles-panel="transparent"] .setup-preview-scale .game-board-card,
 
 body[data-ranking-panel="transparent"] .host-game .leaderboard-panel,
 body[data-ranking-panel="transparent"] .host-lobby .leaderboard-panel,
-body[data-ranking-panel="transparent"] .setup-preview-scale .leaderboard-panel,
+body[data-ranking-panel="transparent"] .setup-preview-inner .leaderboard-panel,
 [data-ranking-panel="transparent"] .demo-leaderboard {
   background: transparent;
   border-color: transparent;
@@ -2302,49 +2287,49 @@ body[data-bg="royal"] .orb-1 { background: radial-gradient(circle, rgba(167, 139
 
 /* Layout patterns — game + live demo */
 body[data-pattern="spotlight"] .host-game .layout,
-body[data-pattern="spotlight"] .setup-preview-scale .layout {
+body[data-pattern="spotlight"] .setup-preview-inner .layout {
   grid-template-columns: 1fr minmax(180px, 220px);
 }
 
 body[data-pattern="spotlight"] .host-game .circle,
-body[data-pattern="spotlight"] .setup-preview-scale .circle {
+body[data-pattern="spotlight"] .setup-preview-inner .circle {
   width: 260px;
   height: 260px;
 }
 
 body[data-pattern="stage"] .host-game .layout,
-body[data-pattern="stage"] .setup-preview-scale .layout {
+body[data-pattern="stage"] .setup-preview-inner .layout {
   grid-template-columns: 1fr;
   max-width: 720px;
   margin: 0 auto;
 }
 
 body[data-pattern="stage"] .host-game .circles,
-body[data-pattern="stage"] .setup-preview-scale .circles {
+body[data-pattern="stage"] .setup-preview-inner .circles {
   grid-template-columns: 1fr;
   justify-items: center;
   gap: 1.5rem;
 }
 
 body[data-pattern="wide"] .host-game .layout,
-body[data-pattern="wide"] .setup-preview-scale .layout {
+body[data-pattern="wide"] .setup-preview-inner .layout {
   grid-template-columns: 1fr;
 }
 
 body[data-pattern="wide"] .host-game .leaderboard-panel,
-body[data-pattern="wide"] .setup-preview-scale .leaderboard-panel {
+body[data-pattern="wide"] .setup-preview-inner .leaderboard-panel {
   max-width: none;
 }
 
 body[data-pattern="wide"] .host-game .circles,
-body[data-pattern="wide"] .setup-preview-scale .circles {
+body[data-pattern="wide"] .setup-preview-inner .circles {
   grid-template-columns: 1fr 1fr;
   max-width: 900px;
   margin: 0 auto;
 }
 
 body[data-pattern="cinema"] .host-game .circle,
-body[data-pattern="cinema"] .setup-preview-scale .circle {
+body[data-pattern="cinema"] .setup-preview-inner .circle {
   border-width: 3px;
   border-color: rgba(240, 193, 77, 0.55);
   box-shadow:
