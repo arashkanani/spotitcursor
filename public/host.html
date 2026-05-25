@@ -102,6 +102,7 @@
           <p class="setup-preview-label">Live preview — background, circles &amp; ranking</p>
           <div id="setupLiveDemo" class="setup-live-demo setup-game-preview-panel card" data-pattern="classic">
             <div class="setup-preview-viewport">
+              <div class="setup-preview-frame">
               <div id="setupPreviewScene" class="setup-preview-scene" data-bg="midnight" data-pattern="classic">
                 <div class="setup-preview-bg bg-mesh" aria-hidden="true"></div>
                 <div class="setup-preview-vignette" aria-hidden="true"></div>
@@ -137,6 +138,7 @@
                     </aside>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
             <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls">
@@ -359,8 +361,11 @@
     const setupLiveDemo = document.getElementById("setupLiveDemo");
     const setupPreviewScene = document.getElementById("setupPreviewScene");
     const setupPreviewViewport = setupLiveDemo?.querySelector(".setup-preview-viewport");
-    const SETUP_PREVIEW_SCALE_TARGET = 0.25;
-    const SETUP_PREVIEW_SCALE_MAX = 0.5;
+    const setupPreviewFrame = setupLiveDemo?.querySelector(".setup-preview-frame");
+    const SETUP_PREVIEW_REF_WIDTH = 1080;
+    const SETUP_PREVIEW_REF_HEIGHT = 620;
+    const SETUP_PREVIEW_SCALE_TARGET = 0.42;
+    const SETUP_PREVIEW_SCALE_MAX = 0.58;
     const demoLeftCircle = document.getElementById("demoLeftCircle");
     const demoRightCircle = document.getElementById("demoRightCircle");
     const setupMessage = document.getElementById("setupMessage");
@@ -519,41 +524,53 @@
     }
 
     function getSetupPreviewReferenceSize() {
-      const width = Math.round(window.innerWidth || 1920);
-      const height = Math.round(window.innerHeight || 1080);
       return {
-        width: Math.max(960, width),
-        height: Math.max(540, height)
+        width: SETUP_PREVIEW_REF_WIDTH,
+        height: SETUP_PREVIEW_REF_HEIGHT
       };
     }
 
     function fitSetupPreviewScale() {
       if (!setupPreviewViewport || !setupPreviewScene) return;
       const ref = getSetupPreviewReferenceSize();
-      setupPreviewScene.style.width = `${ref.width}px`;
-      setupPreviewScene.style.height = `${ref.height}px`;
-
-      const panelWidth = setupPreviewViewport.clientWidth
-        || setupLiveDemo?.clientWidth
-        || 400;
-      if (panelWidth < 16) {
-        setupPreviewViewport.style.minHeight = "240px";
-        return;
-      }
+      const panelWidth = Math.max(
+        setupPreviewViewport.clientWidth || 0,
+        setupLiveDemo?.clientWidth || 0,
+        setupPreviewViewport.offsetParent?.clientWidth || 0,
+        320
+      );
       const heightBudget = Math.min(
-        Math.max(200, window.innerHeight * 0.38),
-        380
+        Math.max(260, window.innerHeight * 0.42),
+        520
       );
       const scaleToFit = Math.min(
         panelWidth / ref.width,
         heightBudget / ref.height
       );
       const fit = Math.max(
-        0.18,
+        0.28,
         Math.min(SETUP_PREVIEW_SCALE_MAX, SETUP_PREVIEW_SCALE_TARGET, scaleToFit)
       );
-      setupPreviewScene.style.setProperty("--preview-fit-scale", String(fit));
-      setupPreviewViewport.style.height = `${Math.ceil(ref.height * fit)}px`;
+      const displayW = Math.ceil(ref.width * fit);
+      const displayH = Math.ceil(ref.height * fit);
+
+      setupPreviewScene.style.width = `${ref.width}px`;
+      setupPreviewScene.style.height = `${ref.height}px`;
+      setupPreviewScene.style.transform = `scale(${fit})`;
+      setupPreviewScene.style.transformOrigin = "top left";
+
+      if (setupPreviewFrame) {
+        setupPreviewFrame.style.width = `${displayW}px`;
+        setupPreviewFrame.style.height = `${displayH}px`;
+      }
+      setupPreviewViewport.style.height = `${displayH}px`;
+      setupPreviewViewport.style.minHeight = `${Math.max(220, displayH)}px`;
+    }
+
+    function scheduleDashboardPreview() {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => refreshDashboardPreview());
+      });
     }
 
     function applyPreviewBackgroundLayer(cacheVersion) {
@@ -570,6 +587,8 @@
         setupPreviewScene.style.removeProperty("--custom-bg-pos-y");
         setupPreviewScene.style.removeProperty("--custom-bg-size");
         clearCustomBgMesh(mesh);
+        mesh.style.removeProperty("background");
+        mesh.style.removeProperty("background-image");
         return;
       }
 
@@ -911,7 +930,7 @@
         eventCustomizePanel?.classList.remove("hidden");
         sponsorEditPanel?.classList.add("hidden");
         sponsorLibraryPanel?.classList.remove("hidden");
-        requestAnimationFrame(() => refreshDashboardPreview());
+        scheduleDashboardPreview();
       } else if (phase === "sponsor-edit") {
         patternPickerPanel?.classList.add("hidden");
         eventCustomizePanel?.classList.add("hidden");
@@ -957,7 +976,7 @@
       const pid = patternId || selectedThemePattern || "classic";
       showSetupPhase("customize");
       enterPattern(pid, { quiet: true });
-      requestAnimationFrame(() => refreshDashboardPreview());
+      scheduleDashboardPreview();
     }
 
     function enterPattern(patternId, options = {}) {
@@ -2495,6 +2514,15 @@
     attachCircleRenderObserver(editPreviewCircle);
     attachCircleRenderObserver(demoLeftCircle);
     attachCircleRenderObserver(demoRightCircle);
+
+    if (setupLiveDemo && typeof ResizeObserver !== "undefined") {
+      const previewResizeObserver = new ResizeObserver(() => {
+        if (setupPhase === "customize" && !setupView.classList.contains("hidden")) {
+          scheduleDashboardPreview();
+        }
+      });
+      previewResizeObserver.observe(setupLiveDemo);
+    }
 
     startBtn.addEventListener("click", () => {
       primeGameAudio();
