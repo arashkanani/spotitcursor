@@ -58,6 +58,37 @@ function playRoundWinSound() {
   }
 }
 
+function playRoundTimeoutSound() {
+  try {
+    const ctx = getGameAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") void ctx.resume();
+
+    const now = ctx.currentTime;
+
+    function tone(freq, start, duration, volume, type) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(volume, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + duration + 0.05);
+    }
+
+    tone(392, now, 0.22, 0.16, "triangle");
+    tone(311.13, now + 0.2, 0.28, 0.18, "triangle");
+    tone(261.63, now + 0.42, 0.38, 0.14, "sine");
+    tone(196, now + 0.55, 0.5, 0.08, "sine");
+  } catch (_err) {
+    // Ignore if audio is blocked or unavailable.
+  }
+}
+
 const FALLBACK_SHAPE_ICONS = {
   circle: "⭕",
   square: "⬜",

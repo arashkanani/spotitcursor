@@ -53,9 +53,11 @@ Optional environment variables:
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `MAX_PLAYERS` | 120 | Hard cap on registrations |
-| `ROUND_TIMEOUT_MS` | 60000 | Auto-advance round if nobody wins (ms) |
+| `ROUND_TIMEOUT_MS` | 60000 | Auto-advance round if nobody wins (ms); set `0` to disable |
 
 Registration **closes automatically** when the host presses Start. Players who disconnect during a game can reconnect with the same phone (saved token). New scans during an active game are rejected.
+
+Event planners customize **title, page layout (5 patterns), and background (5 styles)** in the host setup screen; choices are saved to `data/event-config.json` on the server (use optional Render disk + `DATA_DIR` so themes survive redeploys).
 
 ## Keep sponsor shapes after redeploy (optional)
 

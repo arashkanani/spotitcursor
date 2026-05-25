@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body class="mobile-body">
+<body class="mobile-body" data-bg="midnight" data-pattern="classic">
   <div class="bg-mesh"></div>
   <div class="bg-vignette"></div>
   <div class="page">
@@ -75,6 +75,17 @@
 
     const MISTAKES_PER_ROUND = 3;
     const PLAYER_TOKEN_KEY = "spotit_player_token";
+
+    function applyMobileTheme(branding) {
+      const bg = branding?.themeBackground || "midnight";
+      document.body.dataset.bg = bg;
+      document.body.dataset.pattern = branding?.themePattern || "classic";
+      if (bg === "custom" && branding?.customBackgroundUrl) {
+        document.body.style.setProperty("--custom-bg-url", `url("${branding.customBackgroundUrl}")`);
+      } else {
+        document.body.style.removeProperty("--custom-bg-url");
+      }
+    }
     let joined = false;
     let myProfile = null;
     let canPick = false;
@@ -347,7 +358,17 @@
       updateTriesDisplay();
     });
 
+    socket.on("eventBranding", (branding) => {
+      applyMobileTheme(branding);
+    });
+
+    fetch("/api/event-branding")
+      .then((res) => res.json())
+      .then((branding) => applyMobileTheme(branding))
+      .catch(() => {});
+
     socket.on("gameState", (state) => {
+      if (state.eventBranding) applyMobileTheme(state.eventBranding);
       if (!joined) {
         if (state.registrationOpen === false) {
           joinMessage.textContent = "Game in progress — registration is closed.";
@@ -409,6 +430,7 @@
       canPick = false;
       canPickThisRound = false;
       mobileStatus.textContent = `Time's up — round ${data.roundNumber} ended with no winner.`;
+      playRoundTimeoutSound();
     });
 
     socket.on("gameOver", (data) => {

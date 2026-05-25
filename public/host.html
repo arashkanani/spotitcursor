@@ -20,38 +20,115 @@
   <div class="page">
     <section id="setupView" class="host-setup">
       <div class="setup-card card">
-        <div id="sponsorLibraryPanel">
+        <div id="patternPickerPanel" class="pattern-picker-panel">
           <div class="setup-intro">
-            <p class="event-eyebrow">Step 1 · Pick your sponsor</p>
-            <h2 class="setup-title">Choose a sponsor &amp; edit circle shapes</h2>
-            <p class="setup-subtitle">Select who sponsors this game, then open <strong>Edit shapes</strong> to add or remove the PNG icons that appear inside the two circles.</p>
+            <p class="event-eyebrow">Event planner · Start here</p>
+            <h2 class="setup-title">Choose your game screen layout</h2>
+            <p class="setup-subtitle">Pick one of 5 patterns. Next you’ll set the <strong>title</strong>, <strong>background</strong>, and <strong>sponsor shapes</strong> inside a live preview.</p>
+          </div>
+          <div id="patternLaunchGrid" class="pattern-launch-grid" role="listbox" aria-label="Game screen patterns"></div>
+          <p class="setup-hint" id="patternPickerHint">Loading layouts…</p>
+        </div>
+
+        <div id="eventCustomizePanel" class="event-customize-panel hidden">
+          <div class="customize-top-bar">
+            <button type="button" id="backToPatternsBtn" class="ghost-btn">← Change layout</button>
+            <p class="customize-pattern-badge" id="selectedPatternBadge">Classic split</p>
           </div>
 
           <div class="setup-section">
-            <div class="setup-section-head">
-              <h3 class="setup-section-title">Existing sponsors</h3>
-              <button type="button" id="newSponsorBtn" class="ghost-btn">+ New sponsor</button>
-            </div>
-            <div id="sponsorGrid" class="sponsor-grid" aria-live="polite"></div>
-            <p class="setup-hint" id="sponsorGridHint">Loading…</p>
+            <label class="field-label" for="eventTitleInput">Game / event title</label>
+            <input id="eventTitleInput" type="text" placeholder="e.g. Gulf Innovation Championship 2026" maxlength="80">
           </div>
 
-          <div id="chosenSponsorBar" class="chosen-sponsor-bar hidden">
-            <div class="chosen-sponsor-main">
-              <p class="chosen-sponsor-label">Selected for this game</p>
-              <h3 id="chosenSponsorName" class="chosen-sponsor-name">—</h3>
-              <p id="chosenSponsorStatus" class="chosen-sponsor-status"></p>
+          <div class="setup-section">
+            <h3 class="setup-section-title">Background</h3>
+            <p class="setup-hint">Pick a preset or upload your own image (JPG, PNG, WebP).</p>
+            <div id="backgroundPicker" class="theme-option-grid theme-bg-grid" role="listbox" aria-label="Background"></div>
+            <div class="background-upload-row">
+              <label class="photo-upload-btn" for="customBackgroundInput">Upload custom background</label>
+              <input id="customBackgroundInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+              <span id="customBackgroundStatus" class="setup-hint"></span>
             </div>
-            <div class="chosen-sponsor-actions">
-              <button type="button" id="editChosenShapesBtn" class="start-game-btn">Edit circle shapes</button>
-              <button type="button" id="changeSponsorBtn" class="ghost-btn">Change sponsor</button>
+          </div>
+
+          <div class="setup-section">
+            <h3 class="setup-section-title">Panel style</h3>
+            <p class="setup-hint">Show the circles area and ranking with a glass card, or fully transparent so only the background shows through.</p>
+            <label class="panel-style-toggle">
+              <input type="checkbox" id="circlesPanelTransparent">
+              <span>Circles panel — <strong>transparent</strong> (hide card frame)</span>
+            </label>
+            <label class="panel-style-toggle">
+              <input type="checkbox" id="rankingPanelTransparent">
+              <span>Ranking panel — <strong>transparent</strong> (hide card frame)</span>
+            </label>
+          </div>
+
+          <div id="sponsorLibraryPanel" class="customize-sponsor-block">
+            <div class="setup-section-head">
+              <h3 class="setup-section-title">Sponsor shape pack</h3>
+              <button type="button" id="newSponsorBtn" class="ghost-btn">+ New sponsor</button>
             </div>
+            <p class="setup-hint">PNG icons shown inside the circles. Need at least <span id="editMinShapesInline">19</span> shapes.</p>
+            <div id="sponsorGrid" class="sponsor-grid" aria-live="polite"></div>
+            <p class="setup-hint" id="sponsorGridHint">Loading…</p>
+
+            <div id="chosenSponsorBar" class="chosen-sponsor-bar hidden">
+              <div class="chosen-sponsor-main">
+                <p class="chosen-sponsor-label">Selected pack</p>
+                <h3 id="chosenSponsorName" class="chosen-sponsor-name">—</h3>
+                <p id="chosenSponsorStatus" class="chosen-sponsor-status"></p>
+              </div>
+              <div class="chosen-sponsor-actions">
+                <button type="button" id="editChosenShapesBtn" class="start-game-btn">Edit circle shapes</button>
+              </div>
+            </div>
+          </div>
+
+          <p class="setup-preview-label">Live demo — your game screen</p>
+          <div id="setupLiveDemo" class="setup-live-demo card">
+            <header class="event-branding-bar setup-preview-bar">
+              <div class="event-branding-main">
+                <p class="event-eyebrow">Live Event</p>
+                <h2 class="event-title" data-event-title>Your Event Title</h2>
+                <p class="event-sponsor-line" data-event-sponsor hidden></p>
+              </div>
+              <div class="round-pill game-status-pill demo-status-pill">
+                <span class="game-status-round">Round 3 / 20</span>
+                <span class="game-status-players">24 players</span>
+              </div>
+            </header>
+            <div class="demo-game-shell">
+              <div class="demo-game-board card">
+                <div class="circles demo-circles">
+                  <div class="circle demo-circle" id="demoLeftCircle">
+                    <div class="circle-shapes-layer"></div>
+                  </div>
+                  <div class="circle demo-circle" id="demoRightCircle">
+                    <div class="circle-shapes-layer"></div>
+                  </div>
+                </div>
+              </div>
+              <aside class="card demo-leaderboard">
+                <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
+                <ul class="rank-list demo-rank-list">
+                  <li class="rank-item"><div class="leaderboard-row rank-first"><div class="rank-badge"><span class="rank-medal">🥇</span></div><div class="rank-player"><span class="player-name">Alex</span></div><div class="rank-score"><span class="rank-score-num">5</span></div></div></li>
+                  <li class="rank-item"><div class="leaderboard-row"><div class="rank-badge"><span class="rank-num">2</span></div><div class="rank-player"><span class="player-name">Sam</span></div><div class="rank-score"><span class="rank-score-num">4</span></div></div></li>
+                </ul>
+              </aside>
+            </div>
+          </div>
+
+          <p class="status" id="setupMessage"></p>
+          <div class="setup-continue-row">
+            <button type="button" id="continueToLobbyBtn" class="start-game-btn">Continue to player lobby →</button>
           </div>
         </div>
 
         <div id="sponsorEditPanel" class="sponsor-edit-panel hidden">
           <div class="edit-mode-header">
-            <button type="button" id="editBackBtn" class="ghost-btn">← All packs</button>
+            <button type="button" id="editBackBtn" class="ghost-btn">← Back to design</button>
             <div>
               <p class="event-eyebrow">Edit mode</p>
               <h3 class="setup-section-title" id="editModeTitle">Circle shapes</h3>
@@ -98,24 +175,6 @@
           </div>
         </div>
 
-        <div class="setup-section setup-section-event">
-          <label class="field-label" for="eventTitleInput">Event title</label>
-          <input id="eventTitleInput" type="text" placeholder="e.g. Gulf Innovation Championship 2026" maxlength="80">
-        </div>
-
-        <p class="setup-preview-label">Live preview</p>
-        <header class="event-branding-bar setup-preview-bar">
-          <div class="event-branding-main">
-            <p class="event-eyebrow">Live Event</p>
-            <h2 class="event-title" data-event-title>Your Event Title</h2>
-            <p class="event-sponsor-line" data-event-sponsor hidden></p>
-          </div>
-        </header>
-
-        <p class="status" id="setupMessage"></p>
-        <div class="setup-continue-row">
-          <button type="button" id="continueToLobbyBtn" class="start-game-btn">Continue to player lobby →</button>
-        </div>
       </div>
     </section>
 
@@ -160,7 +219,10 @@
           <p class="event-sponsor-line" data-event-sponsor hidden></p>
         </div>
         <button type="button" id="backToMenuBtn" class="edit-event-btn" title="End game and return to event setup">← Main menu</button>
-        <div class="round-pill" id="statusText">Round 1 / 20</div>
+        <div class="round-pill game-status-pill" id="statusText">
+          <span class="game-status-round" id="gameStatusRound">Round 1 / 20</span>
+          <span class="game-status-players" id="gameStatusPlayers">0 players</span>
+        </div>
       </header>
 
       <div class="layout">
@@ -217,7 +279,17 @@
     const chosenSponsorName = document.getElementById("chosenSponsorName");
     const chosenSponsorStatus = document.getElementById("chosenSponsorStatus");
     const editChosenShapesBtn = document.getElementById("editChosenShapesBtn");
-    const changeSponsorBtn = document.getElementById("changeSponsorBtn");
+    const patternPickerPanel = document.getElementById("patternPickerPanel");
+    const eventCustomizePanel = document.getElementById("eventCustomizePanel");
+    const patternLaunchGrid = document.getElementById("patternLaunchGrid");
+    const patternPickerHint = document.getElementById("patternPickerHint");
+    const backToPatternsBtn = document.getElementById("backToPatternsBtn");
+    const selectedPatternBadge = document.getElementById("selectedPatternBadge");
+    const customBackgroundInput = document.getElementById("customBackgroundInput");
+    const customBackgroundStatus = document.getElementById("customBackgroundStatus");
+    const circlesPanelTransparentInput = document.getElementById("circlesPanelTransparent");
+    const rankingPanelTransparentInput = document.getElementById("rankingPanelTransparent");
+    const editMinShapesInline = document.getElementById("editMinShapesInline");
     const newSponsorBtn = document.getElementById("newSponsorBtn");
     const editBackBtn = document.getElementById("editBackBtn");
     const editDoneBtn = document.getElementById("editDoneBtn");
@@ -236,6 +308,10 @@
     const editUploadBtn = document.getElementById("editUploadBtn");
     const editSaveNewPackBtn = document.getElementById("editSaveNewPackBtn");
     const continueToLobbyBtn = document.getElementById("continueToLobbyBtn");
+    const backgroundPicker = document.getElementById("backgroundPicker");
+    const setupLiveDemo = document.getElementById("setupLiveDemo");
+    const demoLeftCircle = document.getElementById("demoLeftCircle");
+    const demoRightCircle = document.getElementById("demoRightCircle");
     const setupMessage = document.getElementById("setupMessage");
     const editEventBtn = document.getElementById("editEventBtn");
     const backToMenuBtn = document.getElementById("backToMenuBtn");
@@ -248,6 +324,19 @@
     const rightCircle = document.getElementById("rightCircle");
     const rankingList = document.getElementById("rankingList");
     const statusText = document.getElementById("statusText");
+    const gameStatusRound = document.getElementById("gameStatusRound");
+    const gameStatusPlayers = document.getElementById("gameStatusPlayers");
+
+    function setGameStatusHud(roundNumber, totalRounds, playerCount) {
+      if (gameStatusRound) {
+        gameStatusRound.textContent = `Round ${roundNumber} / ${totalRounds}`;
+      }
+      if (gameStatusPlayers) {
+        const count = Number(playerCount) || 0;
+        gameStatusPlayers.textContent = `${count} player${count === 1 ? "" : "s"}`;
+        gameStatusPlayers.hidden = false;
+      }
+    }
     const startBtn = document.getElementById("startBtn");
     const bodyEl = document.body;
 
@@ -274,6 +363,259 @@
     let editContext = null;
     let editShapeItems = [];
     let editBlobUrls = [];
+    let themeCatalog = { patterns: [], backgrounds: [], presets: [] };
+    let selectedThemePattern = null;
+    let selectedThemeBackground = "midnight";
+    let customBackgroundUrl = null;
+    let circlesPanelTransparent = false;
+    let rankingPanelTransparent = false;
+    let setupPhase = "patterns";
+
+    const PATTERN_DEFAULT_BG = {
+      classic: "midnight",
+      spotlight: "ocean",
+      stage: "sunset",
+      wide: "royal",
+      cinema: "emerald"
+    };
+
+    function applyGameTheme(pattern, background, customUrl) {
+      if (pattern) selectedThemePattern = pattern;
+      if (background) selectedThemeBackground = background;
+
+      if (selectedThemeBackground === "custom") {
+        if (customUrl !== undefined) customBackgroundUrl = customUrl;
+      } else {
+        customBackgroundUrl = null;
+      }
+
+      document.body.dataset.pattern = selectedThemePattern || "classic";
+      document.body.dataset.bg = selectedThemeBackground;
+
+      document.documentElement.style.removeProperty("--custom-bg-url");
+      document.body.style.removeProperty("--custom-bg-url");
+      if (setupLiveDemo) setupLiveDemo.style.removeProperty("--custom-bg-url");
+
+      if (selectedThemeBackground === "custom" && customBackgroundUrl) {
+        const urlValue = `url("${customBackgroundUrl}")`;
+        document.documentElement.style.setProperty("--custom-bg-url", urlValue);
+        document.body.style.setProperty("--custom-bg-url", urlValue);
+        if (setupLiveDemo) setupLiveDemo.style.setProperty("--custom-bg-url", urlValue);
+      }
+
+      document.querySelectorAll(".bg-mesh").forEach((layer) => {
+        layer.style.removeProperty("background");
+        layer.style.removeProperty("background-image");
+      });
+
+      if (setupLiveDemo) {
+        setupLiveDemo.dataset.pattern = selectedThemePattern || "classic";
+        setupLiveDemo.dataset.bg = selectedThemeBackground;
+      }
+
+      if (selectedPatternBadge && selectedThemePattern) {
+        const p = themeCatalog.patterns.find((x) => x.id === selectedThemePattern);
+        selectedPatternBadge.textContent = p ? p.name : selectedThemePattern;
+      }
+
+      syncThemePickerUi();
+    }
+
+    async function persistThemeSelection() {
+      if (!selectedThemePattern || !selectedThemeBackground) return;
+      try {
+        await fetch("/api/event-branding/theme", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            themePattern: selectedThemePattern,
+            themeBackground: selectedThemeBackground
+          })
+        });
+      } catch (_err) {
+        // Local preview still updates; full save happens on continue.
+      }
+    }
+
+    function syncThemePickerUi() {
+      if (patternLaunchGrid) {
+        patternLaunchGrid.querySelectorAll(".pattern-launch-card").forEach((card) => {
+          const on = card.dataset.pattern === selectedThemePattern;
+          card.classList.toggle("is-selected", on);
+          card.setAttribute("aria-selected", on ? "true" : "false");
+        });
+      }
+      if (backgroundPicker) {
+        backgroundPicker.querySelectorAll(".theme-bg-card").forEach((card) => {
+          const on = card.dataset.value === selectedThemeBackground;
+          card.classList.toggle("is-selected", on);
+          card.setAttribute("aria-selected", on ? "true" : "false");
+        });
+      }
+    }
+
+    function applyPanelStyle(branding) {
+      if (branding?.circlesPanelTransparent !== undefined) {
+        circlesPanelTransparent = !!branding.circlesPanelTransparent;
+      }
+      if (branding?.rankingPanelTransparent !== undefined) {
+        rankingPanelTransparent = !!branding.rankingPanelTransparent;
+      }
+
+      const circlesMode = circlesPanelTransparent ? "transparent" : "solid";
+      const rankingMode = rankingPanelTransparent ? "transparent" : "solid";
+      document.body.dataset.circlesPanel = circlesMode;
+      document.body.dataset.rankingPanel = rankingMode;
+      if (setupLiveDemo) {
+        setupLiveDemo.dataset.circlesPanel = circlesMode;
+        setupLiveDemo.dataset.rankingPanel = rankingMode;
+      }
+
+      if (circlesPanelTransparentInput) {
+        circlesPanelTransparentInput.checked = circlesPanelTransparent;
+      }
+      if (rankingPanelTransparentInput) {
+        rankingPanelTransparentInput.checked = rankingPanelTransparent;
+      }
+    }
+
+    function showSetupPhase(phase) {
+      setupPhase = phase;
+      if (phase === "patterns") {
+        patternPickerPanel?.classList.remove("hidden");
+        eventCustomizePanel?.classList.add("hidden");
+        sponsorEditPanel?.classList.add("hidden");
+        sponsorLibraryPanel?.classList.remove("hidden");
+      } else if (phase === "customize") {
+        patternPickerPanel?.classList.add("hidden");
+        eventCustomizePanel?.classList.remove("hidden");
+        sponsorEditPanel?.classList.add("hidden");
+        sponsorLibraryPanel?.classList.remove("hidden");
+        void refreshSetupLiveDemo();
+      } else if (phase === "sponsor-edit") {
+        patternPickerPanel?.classList.add("hidden");
+        eventCustomizePanel?.classList.add("hidden");
+        showSponsorEditMode();
+      }
+    }
+
+    function enterPattern(patternId) {
+      const pattern = themeCatalog.patterns.find((p) => p.id === patternId);
+      if (!pattern) return;
+      const defaultBg = PATTERN_DEFAULT_BG[patternId] || "midnight";
+      applyGameTheme(patternId, defaultBg, null);
+      showSetupPhase("customize");
+      setupMessage.textContent = `Customizing “${pattern.name}” — set title, background, and sponsor shapes below.`;
+      eventTitleInput?.focus();
+    }
+
+    function buildPatternLaunchGrid() {
+      if (!patternLaunchGrid || !themeCatalog.patterns.length) return;
+
+      patternLaunchGrid.innerHTML = "";
+      for (const pattern of themeCatalog.patterns) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `pattern-launch-card pattern-launch-${pattern.id}`;
+        btn.dataset.pattern = pattern.id;
+        btn.setAttribute("role", "option");
+        btn.innerHTML = `
+          <span class="pattern-launch-mock pattern-mock-${pattern.id}" aria-hidden="true">
+            <span class="mock-circle mock-left"></span>
+            <span class="mock-circle mock-right"></span>
+            <span class="mock-rank"></span>
+          </span>
+          <span class="pattern-launch-name">${escapeHtml(pattern.name)}</span>
+          <span class="pattern-launch-desc">${escapeHtml(pattern.description)}</span>
+          <span class="pattern-launch-cta">Customize this layout →</span>
+        `;
+        btn.addEventListener("click", () => enterPattern(pattern.id));
+        patternLaunchGrid.appendChild(btn);
+      }
+
+      if (patternPickerHint) {
+        patternPickerHint.textContent = "Click a layout to open the design screen.";
+      }
+
+      buildBackgroundPicker();
+      syncThemePickerUi();
+    }
+
+    function buildBackgroundPicker() {
+      if (!backgroundPicker || !themeCatalog.backgrounds.length) return;
+
+      backgroundPicker.innerHTML = "";
+      for (const bg of themeCatalog.backgrounds) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `theme-bg-card theme-bg-${bg.id}`;
+        btn.dataset.value = bg.id;
+        btn.setAttribute("role", "option");
+        btn.innerHTML = `
+          <span class="theme-bg-swatch" aria-hidden="true"></span>
+          <span class="theme-option-name">${escapeHtml(bg.name)}</span>
+        `;
+        btn.title = bg.description;
+        btn.addEventListener("click", async () => {
+          applyGameTheme(selectedThemePattern, bg.id, null);
+          if (customBackgroundStatus) customBackgroundStatus.textContent = "";
+          await persistThemeSelection();
+          updateSetupPreview();
+        });
+        backgroundPicker.appendChild(btn);
+      }
+
+      const customBtn = document.createElement("button");
+      customBtn.type = "button";
+      customBtn.className = "theme-bg-card theme-bg-custom";
+      customBtn.dataset.value = "custom";
+      customBtn.setAttribute("role", "option");
+      customBtn.innerHTML = `
+        <span class="theme-bg-swatch theme-bg-swatch-custom" aria-hidden="true">+</span>
+        <span class="theme-option-name">Your upload</span>
+      `;
+      customBtn.title = "Use uploaded background image";
+      customBtn.addEventListener("click", () => {
+        if (!customBackgroundUrl) {
+          customBackgroundInput?.click();
+          return;
+        }
+        applyGameTheme(selectedThemePattern, "custom", customBackgroundUrl);
+        updateSetupPreview();
+      });
+      backgroundPicker.appendChild(customBtn);
+
+      syncThemePickerUi();
+    }
+
+    async function refreshSetupLiveDemo() {
+      const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
+      if (!sponsor || !demoLeftCircle || !demoRightCircle) return;
+
+      let urls = sponsor.previewShapes || [];
+      if (sponsor.ready) {
+        try {
+          const res = await fetch(`/api/sponsors/${encodeURIComponent(sponsor.id)}`);
+          if (res.ok) {
+            const detail = await res.json();
+            urls = detail.shapes || urls;
+          }
+        } catch (_err) {
+          // Use preview thumbnails only.
+        }
+      }
+
+      const sample = urls.length >= 6
+        ? urls.slice(0, 10)
+        : ["circle", "star", "heart", "bolt", "moon", "sun", "diamond", "cloud", "key", "gift"];
+      const half = Math.ceil(sample.length / 2);
+      demoLeftCircle._shapeLayoutLocked = false;
+      demoRightCircle._shapeLayoutLocked = false;
+      demoLeftCircle._shapeDisplayCache = null;
+      demoRightCircle._shapeDisplayCache = null;
+      scheduleRenderShapes(demoLeftCircle, sample.slice(0, half));
+      scheduleRenderShapes(demoRightCircle, sample.slice(half));
+    }
 
     function applyEventBranding(branding) {
       const title = String(branding?.title || "").trim() || "Shape Match";
@@ -286,6 +628,15 @@
       }
       if (branding?.sponsorId) {
         selectedSponsorId = branding.sponsorId;
+      }
+      const bg = branding?.themeBackground;
+      const customUrl = bg === "custom" ? (branding?.customBackgroundUrl || null) : null;
+      applyGameTheme(branding?.themePattern, bg, customUrl);
+      applyPanelStyle(branding);
+      if (branding?.themePattern) {
+        showSetupPhase("customize");
+      } else {
+        showSetupPhase("patterns");
       }
       const sponsorLabel = branding?.sponsorName
         ? `Shapes by ${branding.sponsorName}`
@@ -301,6 +652,7 @@
       });
       renderSponsorGrid();
       updateChosenSponsorBar();
+      if (setupPhase === "customize") void refreshSetupLiveDemo();
     }
 
     function selectSponsor(sponsorId) {
@@ -309,6 +661,7 @@
       selectedSponsorId = sponsorId;
       renderSponsorGrid();
       updateChosenSponsorBar();
+      if (setupPhase === "customize") void refreshSetupLiveDemo();
       document.querySelectorAll("[data-event-sponsor]").forEach((el) => {
         el.textContent = `Shapes by ${sponsor.name}`;
         el.hidden = false;
@@ -327,9 +680,10 @@
         openSponsorEdit(sponsor.id, sponsor.name);
         return;
       }
-      showSponsorLibrary();
-      setupMessage.textContent = `${sponsor.name} selected (${sponsor.shapeCount} shapes). Enter event title and continue to the lobby.`;
-      continueToLobbyBtn.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (setupPhase !== "customize") {
+        enterPattern(selectedThemePattern || "classic");
+      }
+      setupMessage.textContent = `${sponsor.name} selected — finish title & background, then continue to the lobby.`;
     }
 
     function updateChosenSponsorBar() {
@@ -352,9 +706,11 @@
         chosenSponsorStatus.classList.add("is-warning");
         chosenSponsorStatus.classList.remove("is-ready");
       }
+      if (setupPhase === "customize") void refreshSetupLiveDemo();
     }
 
     function showSponsorLibrary() {
+      showSetupPhase(setupPhase === "sponsor-edit" ? "customize" : setupPhase);
       sponsorLibraryPanel.classList.remove("hidden");
       sponsorEditPanel.classList.add("hidden");
       editContext = null;
@@ -363,6 +719,8 @@
     }
 
     function showSponsorEditMode() {
+      patternPickerPanel?.classList.add("hidden");
+      eventCustomizePanel?.classList.add("hidden");
       sponsorLibraryPanel.classList.add("hidden");
       sponsorEditPanel.classList.remove("hidden");
     }
@@ -503,7 +861,7 @@
       editSaveNewPackBtn.classList.add("hidden");
       editUploadBtn.classList.remove("hidden");
       editModeTitle.textContent = `${name} — circle shapes`;
-      showSponsorEditMode();
+      showSetupPhase("sponsor-edit");
 
       try {
         const res = await fetch(`/api/sponsors/${encodeURIComponent(sponsorId)}`);
@@ -533,7 +891,7 @@
       editUploadBtn.classList.add("hidden");
       editModeTitle.textContent = "New sponsor pack";
       editShapesInput.value = "";
-      showSponsorEditMode();
+      showSetupPhase("sponsor-edit");
       refreshEditPreview();
     }
 
@@ -560,6 +918,8 @@
       const data = await res.json();
       sponsorCatalog = data.sponsors || [];
       minShapesRequired = data.minShapes || 19;
+      if (editMinShapesInline) editMinShapesInline.textContent = String(minShapesRequired);
+      if (editMinShapes) editMinShapes.textContent = String(minShapesRequired);
       if (!selectedSponsorId && data.activeSponsorId) {
         selectedSponsorId = data.activeSponsorId;
       }
@@ -640,12 +1000,29 @@
       openSponsorEdit(sponsor.id, sponsor.name);
     });
 
-    changeSponsorBtn.addEventListener("click", () => {
-      selectedSponsorId = null;
-      setupMessage.textContent = "";
-      renderSponsorGrid();
-      updateChosenSponsorBar();
-      sponsorGrid.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    backToPatternsBtn?.addEventListener("click", () => {
+      showSetupPhase("patterns");
+      setupMessage.textContent = "Pick a different game screen layout.";
+      patternLaunchGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    customBackgroundInput?.addEventListener("change", async () => {
+      const file = customBackgroundInput.files?.[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append("background", file);
+      if (customBackgroundStatus) customBackgroundStatus.textContent = "Uploading background…";
+      try {
+        const res = await fetch("/api/event-background", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Upload failed");
+        applyEventBranding(data);
+        if (customBackgroundStatus) customBackgroundStatus.textContent = "Custom background applied.";
+        updateSetupPreview();
+      } catch (err) {
+        if (customBackgroundStatus) customBackgroundStatus.textContent = err.message || "Could not upload.";
+      }
+      customBackgroundInput.value = "";
     });
 
     newSponsorBtn.addEventListener("click", () => {
@@ -654,14 +1031,13 @@
     });
 
     function finishSponsorEdit() {
-      showSponsorLibrary();
+      showSetupPhase("customize");
       loadSponsorCatalog()
         .then(() => {
           updateChosenSponsorBar();
           const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
           if (sponsor?.ready) {
             setupMessage.textContent = `${sponsor.name} is ready — continue to the player lobby when you are set.`;
-            continueToLobbyBtn.scrollIntoView({ behavior: "smooth", block: "nearest" });
           }
         })
         .catch(() => {});
@@ -744,14 +1120,34 @@
     });
 
     function updateSetupPreview() {
-      applyEventBranding({ title: eventTitleInput.value.trim() || "Your Event Title" });
+      applyEventBranding({
+        title: eventTitleInput.value.trim() || "Your Event Title",
+        sponsorId: selectedSponsorId,
+        sponsorName: sponsorCatalog.find((s) => s.id === selectedSponsorId)?.name,
+        themePattern: selectedThemePattern,
+        themeBackground: selectedThemeBackground,
+        customBackgroundUrl,
+        circlesPanelTransparent,
+        rankingPanelTransparent
+      });
     }
+
+    circlesPanelTransparentInput?.addEventListener("change", () => {
+      circlesPanelTransparent = circlesPanelTransparentInput.checked;
+      updateSetupPreview();
+    });
+
+    rankingPanelTransparentInput?.addEventListener("change", () => {
+      rankingPanelTransparent = rankingPanelTransparentInput.checked;
+      updateSetupPreview();
+    });
 
     function showSetupView() {
       hostPinnedView = "setup";
       setupView.classList.remove("hidden");
       lobbyView.classList.add("hidden");
       gameView.classList.add("hidden");
+      showSetupPhase(selectedThemePattern ? "customize" : "patterns");
     }
 
     function showLobbyView() {
@@ -769,7 +1165,7 @@
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (lastGameCircleShapes.left.length || lastGameCircleShapes.right.length) {
-            scheduleRenderGameCircles(lastGameCircleShapes.left, lastGameCircleShapes.right);
+            refreshCircleShapesDisplay();
           }
         });
       });
@@ -786,7 +1182,6 @@
     editEventBtn.addEventListener("click", () => {
       eventTitleInput.value = currentEventTitle;
       showSetupView();
-      showSponsorLibrary();
       updateSetupPreview();
       loadSponsorCatalog().catch(() => {});
     });
@@ -807,9 +1202,8 @@
       socket.emit("hostResetGame");
       eventTitleInput.value = currentEventTitle;
       showSetupView();
-      showSponsorLibrary();
       updateSetupPreview();
-      setupMessage.textContent = "Players were cleared — after setup, continue to the lobby so they can scan the QR and join again.";
+      setupMessage.textContent = "Players were cleared — pick your layout and design again, then continue to the lobby.";
       loadSponsorCatalog().catch(() => {});
     });
 
@@ -818,6 +1212,13 @@
       hostPinnedView = null;
 
       const title = eventTitleInput.value.trim();
+      if (!selectedThemePattern) {
+        setupMessage.textContent = "Choose one of the 5 game screen layouts first.";
+        showSetupPhase("patterns");
+        patternLaunchGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
       if (!title) {
         setupMessage.textContent = "Please enter an event title.";
         eventTitleInput.focus();
@@ -858,7 +1259,15 @@
         const res = await fetch("/api/event-branding", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, sponsorId: selectedSponsorId })
+          body: JSON.stringify({
+            title,
+            sponsorId: selectedSponsorId,
+            themePattern: selectedThemePattern,
+            themeBackground: selectedThemeBackground,
+            customBackgroundUrl: selectedThemeBackground === "custom" ? customBackgroundUrl : null,
+            circlesPanelTransparent,
+            rankingPanelTransparent
+          })
         });
         const data = await res.json();
         if (!res.ok) {
@@ -881,20 +1290,26 @@
       sponsorGridHint.textContent = "Could not load sponsors. Is the server running?";
     });
 
-    fetch("/api/event-branding")
-      .then((res) => res.json())
-      .then((branding) => {
-        if (branding.title && branding.sponsorId) {
+    Promise.all([
+      fetch("/api/themes").then((res) => res.json()),
+      fetch("/api/event-branding").then((res) => res.json())
+    ])
+      .then(([themesData, branding]) => {
+        themeCatalog = themesData;
+        buildPatternLaunchGrid();
+        if (branding.title && branding.sponsorId && branding.themePattern) {
           applyEventBranding(branding);
           showLobbyView();
         } else {
-          if (branding.sponsorId) applyEventBranding(branding);
+          applyEventBranding(branding);
           updateSetupPreview();
           showSetupView();
+          if (!branding.themePattern) showSetupPhase("patterns");
         }
       })
       .catch(() => {
         showSetupView();
+        showSetupPhase("patterns");
       });
 
     fetch("/api/join-info")
@@ -956,10 +1371,18 @@
       return Math.random() * (max - min) + min;
     }
 
-    function getShapePosition(radius, tokenRadius) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.sqrt(Math.random()) * (radius - tokenRadius - 8);
-      return { x: radius + Math.cos(angle) * distance, y: radius + Math.sin(angle) * distance };
+    function hashString(value) {
+      let hash = 0;
+      const text = String(value);
+      for (let i = 0; i < text.length; i += 1) {
+        hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+      }
+      return Math.abs(hash);
+    }
+
+    function seededUnit(seed, salt) {
+      const x = Math.sin((seed + salt) * 12.9898) * 43758.5453;
+      return x - Math.floor(x);
     }
 
     function distance(a, b) {
@@ -968,55 +1391,71 @@
       return Math.sqrt(dx * dx + dy * dy);
     }
 
-    function buildNonOverlappingLayout(shapeCount, radius, minSize, maxSize) {
+    /** Even area coverage: golden-angle spiral + sqrt radius (fills disk homogeneously). */
+    function buildHomogeneousCircleLayout(shapeCount, radius, minSize, maxSize, layoutSeed) {
       const tokens = [];
-      const margin = 7;
-      const sectorCenters = Array.from({ length: shapeCount }, (_, i) => {
-        return (i + 0.5) * ((Math.PI * 2) / shapeCount);
-      });
-      for (let i = sectorCenters.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [sectorCenters[i], sectorCenters[j]] = [sectorCenters[j], sectorCenters[i]];
+      const margin = 5;
+      const inset = 8;
+      const tokenSize = (minSize + maxSize) / 2;
+      const tokenRadius = tokenSize / 2;
+      const maxDist = Math.max(tokenRadius + 4, radius - tokenRadius - inset);
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      const seed = hashString(layoutSeed);
+      const phaseOffset = seededUnit(seed, 1) * Math.PI * 2;
+
+      function collides(point) {
+        return tokens.some((t) => distance(t, point) < t.r + point.r + margin);
+      }
+
+      function makePoint(dist, angle, size) {
+        const r = size / 2;
+        return {
+          x: radius + Math.cos(angle) * dist,
+          y: radius + Math.sin(angle) * dist,
+          r,
+          size
+        };
+      }
+
+      function place(dist, angle, size) {
+        const point = makePoint(dist, angle, size);
+        if (collides(point)) return false;
+        tokens.push(point);
+        return true;
       }
 
       for (let i = 0; i < shapeCount; i += 1) {
-        const tokenSize = randomInRange(minSize, maxSize);
-        const tokenRadius = tokenSize / 2;
-        const sectorBase = sectorCenters[i];
-        let placed = null;
-
-        for (let attempt = 0; attempt < 120; attempt += 1) {
-          const angle = sectorBase + randomInRange(-0.23, 0.23);
-          const radialUnit = randomInRange(0.2, 0.95);
-          const distanceFromCenter = radialUnit * (radius - tokenRadius - 10);
-          const point = {
-            x: radius + Math.cos(angle) * distanceFromCenter,
-            y: radius + Math.sin(angle) * distanceFromCenter,
-            r: tokenRadius,
-            size: tokenSize
-          };
-          const noCollision = tokens.every((t) => distance(t, point) >= (t.r + point.r + margin));
-          if (noCollision) {
-            placed = point;
-            break;
-          }
-        }
+        const areaT = (i + 0.5) / Math.max(1, shapeCount);
+        const baseDist = Math.sqrt(areaT) * maxDist;
+        const baseAngle = phaseOffset + i * goldenAngle;
+        let placed = place(baseDist, baseAngle, tokenSize);
 
         if (!placed) {
-          const fallbackRadius = tokenRadius * 0.82;
-          for (let attempt = 0; attempt < 160; attempt += 1) {
-            const point = getShapePosition(radius, fallbackRadius);
-            point.r = fallbackRadius;
-            point.size = fallbackRadius * 2;
-            const noCollision = tokens.every((t) => distance(t, point) >= (t.r + point.r + margin));
-            if (noCollision) {
-              placed = point;
+          for (let attempt = 0; attempt < 64; attempt += 1) {
+            const ring = 1 + (attempt % 5) * 0.08;
+            const dist = Math.min(
+              maxDist,
+              baseDist * ring + (seededUnit(seed, 10 + i * 17 + attempt) * 2 - 1) * tokenRadius
+            );
+            const angle = baseAngle + (seededUnit(seed, 20 + i * 19 + attempt) * 0.84 - 0.42);
+            if (place(dist, angle, tokenSize)) {
+              placed = true;
               break;
             }
           }
         }
 
-        if (placed) tokens.push(placed);
+        if (!placed) {
+          const sector = ((i + 0.5) / shapeCount) * Math.PI * 2 + phaseOffset;
+          for (let ring = 1; ring <= 6; ring += 1) {
+            const dist = (ring / 6) * maxDist;
+            const angle = sector + (seededUnit(seed, 30 + i * 23 + ring) * 0.24 - 0.12);
+            if (place(dist, angle, tokenSize)) {
+              placed = true;
+              break;
+            }
+          }
+        }
       }
 
       return tokens;
@@ -1027,7 +1466,16 @@
     }
 
     let lastGameCircleShapes = { left: [], right: [] };
+    let lastRenderedRoundShapesKey = "";
     const circleRenderObservers = new Map();
+
+    function circleShapesKey(shapes) {
+      return (shapes || []).join("\0");
+    }
+
+    function gameRoundShapesKey(roundNumber, leftShapes, rightShapes) {
+      return `${roundNumber}|${circleShapesKey(leftShapes)}|${circleShapesKey(rightShapes)}`;
+    }
 
     function getCircleRenderSize(circleEl) {
       const layer = getShapesLayer(circleEl);
@@ -1050,29 +1498,57 @@
       return Math.max(circleEl.clientWidth, circleEl.clientHeight, 0);
     }
 
-    function ensureShapeLayout(shapeCount, radius, minSize, maxSize) {
-      const layout = buildNonOverlappingLayout(shapeCount, radius, minSize, maxSize);
+    function ensureShapeLayout(shapeCount, radius, minSize, maxSize, layoutSeed) {
+      const layout = buildHomogeneousCircleLayout(shapeCount, radius, minSize, maxSize, layoutSeed);
       const tokenSize = (minSize + maxSize) / 2;
+      const tokenRadius = tokenSize / 2;
+      const maxDist = Math.max(tokenRadius + 4, radius - tokenRadius - 8);
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      const seed = hashString(layoutSeed);
+      const phaseOffset = seededUnit(seed, 2) * Math.PI * 2;
+
       for (let i = layout.length; i < shapeCount; i += 1) {
-        const angle = (i / shapeCount) * Math.PI * 2 - Math.PI / 2;
-        const dist = radius * (0.38 + (i % 4) * 0.08);
+        const areaT = (i + 0.5) / Math.max(1, shapeCount);
+        const dist = Math.sqrt(areaT) * maxDist;
+        const angle = phaseOffset + (i + layout.length) * goldenAngle;
         layout.push({
           x: radius + Math.cos(angle) * dist,
           y: radius + Math.sin(angle) * dist,
-          r: tokenSize / 2,
+          r: tokenRadius,
           size: tokenSize
         });
       }
       return layout;
     }
 
+    function circleLayoutLockKey(circleEl, shapes) {
+      return `${lastRenderedRoundShapesKey}|${circleEl.id}|${circleShapesKey(shapes)}`;
+    }
+
+    function applyShapePositions(circleEl, size) {
+      const container = getShapesLayer(circleEl);
+      const cache = circleEl._shapeDisplayCache;
+      if (!container || !cache?.items?.length) return;
+
+      const nodes = container.querySelectorAll(".shape");
+      cache.items.forEach((entry, index) => {
+        const item = nodes[index];
+        if (!item) return;
+        const sz = entry.relSize * size;
+        item.style.left = `${entry.normX * size}px`;
+        item.style.top = `${entry.normY * size}px`;
+        item.style.width = `${sz}px`;
+        item.style.height = `${sz}px`;
+        item.style.setProperty("--shape-size", `${sz * 0.58}px`);
+      });
+    }
+
     function attachCircleRenderObserver(circleEl) {
       if (!circleEl || circleRenderObservers.has(circleEl)) return;
       const observer = new ResizeObserver(() => {
-        const pending = circleEl._pendingShapes;
-        if (!pending?.length) return;
+        if (!circleEl._shapeLayoutLocked) return;
         const size = getCircleRenderSize(circleEl);
-        if (size >= 16) renderShapes(circleEl, pending, size);
+        if (size >= 16) applyShapePositions(circleEl, size);
       });
       observer.observe(circleEl);
       circleRenderObservers.set(circleEl, observer);
@@ -1080,10 +1556,11 @@
 
     function scheduleRenderShapes(circleEl, shapes, attempt = 0) {
       if (!circleEl) return;
-      circleEl._pendingShapes = shapes || [];
+      const list = shapes || [];
+      circleEl._pendingShapes = list;
       const size = getCircleRenderSize(circleEl);
-      if (size >= 16 && circleEl._pendingShapes.length) {
-        renderShapes(circleEl, circleEl._pendingShapes, size);
+      if (size >= 16 && list.length) {
+        renderShapes(circleEl, list, size);
         return;
       }
       if (attempt < 80) {
@@ -1091,13 +1568,62 @@
       }
     }
 
-    function scheduleRenderGameCircles(leftShapes, rightShapes) {
-      lastGameCircleShapes = {
-        left: leftShapes || [],
-        right: rightShapes || []
-      };
-      scheduleRenderShapes(leftCircle, lastGameCircleShapes.left);
-      scheduleRenderShapes(rightCircle, lastGameCircleShapes.right);
+    function scheduleRenderGameCircles(leftShapes, rightShapes, roundNumber) {
+      const left = leftShapes || [];
+      const right = rightShapes || [];
+      const key = gameRoundShapesKey(roundNumber, left, right);
+      if (key === lastRenderedRoundShapesKey) return;
+
+      lastRenderedRoundShapesKey = key;
+      lastGameCircleShapes = { left, right };
+      leftCircle._shapeLayoutLocked = false;
+      rightCircle._shapeLayoutLocked = false;
+      leftCircle._shapeDisplayCache = null;
+      rightCircle._shapeDisplayCache = null;
+      scheduleRenderShapes(leftCircle, left);
+      scheduleRenderShapes(rightCircle, right);
+    }
+
+    function refreshCircleShapesDisplay() {
+      if (lastGameCircleShapes.left.length && leftCircle._shapeLayoutLocked) {
+        applyShapePositions(leftCircle, getCircleRenderSize(leftCircle));
+      } else if (lastGameCircleShapes.left.length) {
+        renderShapes(leftCircle, lastGameCircleShapes.left);
+      }
+      if (lastGameCircleShapes.right.length && rightCircle._shapeLayoutLocked) {
+        applyShapePositions(rightCircle, getCircleRenderSize(rightCircle));
+      } else if (lastGameCircleShapes.right.length) {
+        renderShapes(rightCircle, lastGameCircleShapes.right);
+      }
+    }
+
+    function getOrCreateShapeDisplayCache(circleEl, list, size, layoutSeed) {
+      const shapesKey = circleShapesKey(list);
+      const cache = circleEl._shapeDisplayCache;
+      if (cache && cache.shapesKey === shapesKey && cache.layoutSeed === layoutSeed) {
+        return cache.items;
+      }
+
+      const radius = size / 2;
+      const minSize = size * 0.12;
+      const maxSize = size * 0.2;
+      const layout = ensureShapeLayout(list.length, radius, minSize, maxSize, layoutSeed);
+      const seed = hashString(layoutSeed);
+      const items = list.map((shape, index) => {
+        const slot = layout[index];
+        if (!slot) return null;
+        return {
+          shape,
+          normX: slot.x / size,
+          normY: slot.y / size,
+          relSize: slot.size / size,
+          opacity: 0.45 + seededUnit(seed, 40 + index) * 0.5,
+          rotation: seededUnit(seed, 50 + index) * 56 - 28
+        };
+      }).filter(Boolean);
+
+      circleEl._shapeDisplayCache = { shapesKey, layoutSeed, items };
+      return items;
     }
 
     function renderShapes(circleEl, shapes, knownSize) {
@@ -1106,33 +1632,42 @@
       const list = shapes || [];
       if (!list.length) {
         container.innerHTML = "";
+        circleEl._shapeDisplayCache = null;
+        circleEl._shapeLayoutLocked = false;
         return;
       }
 
       const size = knownSize || getCircleRenderSize(circleEl);
       if (size < 16) return;
 
-      container.innerHTML = "";
-      const radius = size / 2;
-      const minSize = size * 0.12;
-      const maxSize = size * 0.2;
-      const layout = ensureShapeLayout(list.length, radius, minSize, maxSize);
+      const layoutLockKey = circleLayoutLockKey(circleEl, list);
+      if (circleEl._shapeLayoutLocked && circleEl._shapeLayoutLockKey === layoutLockKey) {
+        applyShapePositions(circleEl, size);
+        return;
+      }
 
-      list.forEach((shape, index) => {
-        const slot = layout[index];
-        if (!slot) return;
+      const displayItems = getOrCreateShapeDisplayCache(circleEl, list, size, layoutLockKey);
+      container.innerHTML = "";
+
+      displayItems.forEach((entry) => {
         const item = document.createElement("div");
         item.className = "shape";
-        item.style.left = `${slot.x}px`;
-        item.style.top = `${slot.y}px`;
-        item.style.width = `${slot.size}px`;
-        item.style.height = `${slot.size}px`;
-        item.style.opacity = String(randomInRange(0.45, 0.95));
-        item.style.transform = `translate(-50%, -50%) rotate(${randomInRange(-28, 28)}deg)`;
-        item.style.setProperty("--shape-size", `${slot.size * 0.58}px`);
-        mountShapeContent(item, shape, "shape-photo");
+        const px = entry.normX * size;
+        const py = entry.normY * size;
+        const sz = entry.relSize * size;
+        item.style.left = `${px}px`;
+        item.style.top = `${py}px`;
+        item.style.width = `${sz}px`;
+        item.style.height = `${sz}px`;
+        item.style.opacity = String(entry.opacity);
+        item.style.transform = `translate(-50%, -50%) rotate(${entry.rotation}deg)`;
+        item.style.setProperty("--shape-size", `${sz * 0.58}px`);
+        mountShapeContent(item, entry.shape, "shape-photo");
         container.appendChild(item);
       });
+
+      circleEl._shapeLayoutLocked = true;
+      circleEl._shapeLayoutLockKey = layoutLockKey;
     }
 
     function renderRanking(leaderboard) {
@@ -1151,25 +1686,28 @@
     }
 
     socket.on("eventBranding", (branding) => {
-      applyEventBranding(branding);
       if (hostPinnedView === "setup") return;
+      applyEventBranding(branding);
     });
 
     socket.on("gameState", (state) => {
       latestLeaderboard = state.leaderboard || [];
-      if (state.eventBranding) applyEventBranding(state.eventBranding);
-
       if (hostPinnedView === "setup") return;
+
+      if (state.eventBranding) applyEventBranding(state.eventBranding);
 
       if (state.started && !state.ended) {
         showGameView();
         renderRanking(state.leaderboard);
-        statusText.textContent = `Round ${state.roundNumber} / ${state.totalRounds} · ${state.playerCount || 0} players`;
+        setGameStatusHud(state.roundNumber, state.totalRounds, state.playerCount);
         const round = state.currentRound || {};
-        scheduleRenderGameCircles(round.leftShapes, round.rightShapes);
+        if (round.leftShapes?.length || round.rightShapes?.length) {
+          scheduleRenderGameCircles(round.leftShapes, round.rightShapes, state.roundNumber);
+        }
         return;
       }
 
+      lastRenderedRoundShapesKey = "";
       showLobbyView();
       renderLobbyPlayers(state.leaderboard);
 
@@ -1251,20 +1789,26 @@
 
       roundWinnerHideTimer = setTimeout(() => {
         hideRoundWinnerOverlay();
-        scheduleRenderGameCircles(lastGameCircleShapes.left, lastGameCircleShapes.right);
       }, 4000);
     }
 
     socket.on("roundWinner", (data) => {
       if (!data || !data.winner) return;
-      statusText.textContent = `Round ${data.roundNumber} · ${data.winner.name} wins!`;
+      if (gameStatusRound) {
+        gameStatusRound.textContent = `Round ${data.roundNumber} · ${data.winner.name} wins!`;
+      }
+      if (gameStatusPlayers) gameStatusPlayers.hidden = true;
       showRoundWinnerOverlay(data);
     });
 
     socket.on("roundTimeout", (data) => {
       if (!data) return;
-      statusText.textContent = `Round ${data.roundNumber} — time's up, no winner`;
+      if (gameStatusRound) {
+        gameStatusRound.textContent = `Round ${data.roundNumber} — time's up, no winner`;
+      }
+      if (gameStatusPlayers) gameStatusPlayers.hidden = true;
       hideRoundWinnerOverlay();
+      playRoundTimeoutSound();
     });
 
     socket.on("gameOver", (data) => {
@@ -1284,12 +1828,14 @@
     window.addEventListener("resize", () => {
       if (gameView.classList.contains("hidden")) return;
       if (!lastGameCircleShapes.left.length && !lastGameCircleShapes.right.length) return;
-      scheduleRenderGameCircles(lastGameCircleShapes.left, lastGameCircleShapes.right);
+      refreshCircleShapesDisplay();
     });
 
     attachCircleRenderObserver(leftCircle);
     attachCircleRenderObserver(rightCircle);
     attachCircleRenderObserver(editPreviewCircle);
+    attachCircleRenderObserver(demoLeftCircle);
+    attachCircleRenderObserver(demoRightCircle);
 
     startBtn.addEventListener("click", () => {
       primeGameAudio();

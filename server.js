@@ -9,6 +9,8 @@ const { createServer } = require("http");
 const { Server } = require("socket.io");
 const QRCode = require("qrcode");
 const sponsors = require("./lib/sponsors");
+const eventBrandingStore = require("./lib/event-branding");
+const themes = require("./lib/themes");
 const { PORT, IS_PRODUCTION, PUBLIC_URL, MAX_PLAYERS, ROUND_TIMEOUT_MS } = require("./lib/config");
 
 const app = express();
@@ -36,11 +38,29 @@ const MAX_PHOTO_LENGTH = 220000;
 const ROUND_WINNER_DISPLAY_MS = 4000;
 const MISTAKES_PER_ROUND = 3;
 
-let eventConfig = {
-  title: "",
-  sponsorId: null,
-  sponsorName: null
-};
+let eventConfig = eventBrandingStore.readEventConfig();
+
+const { DATA_DIR } = require("./lib/config");
+const BACKGROUNDS_DIR = path.join(DATA_DIR, "backgrounds");
+fs.mkdirSync(BACKGROUNDS_DIR, { recursive: true });
+
+const backgroundUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, BACKGROUNDS_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `event-background${ext === ".png" || ext === ".webp" || ext === ".jpg" || ext === ".jpeg" ? ext : ".jpg"}`);
+    }
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/(jpeg|jpg|png|webp)$/i.test(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error("Background must be JPG, PNG, or WebP."));
+  }
+});
 
 const shapeUpload = multer({
   storage: multer.memoryStorage(),
@@ -134,6 +154,7 @@ function clearRoundTimer() {
 
 function scheduleRoundTimeout() {
   clearRoundTimer();
+  if (!ROUND_TIMEOUT_MS || ROUND_TIMEOUT_MS < 1000) return;
   if (!game.started || game.ended || !game.currentRound) return;
 
   roundTimer = setTimeout(() => {
@@ -174,12 +195,19 @@ function getEventPayload() {
   const sponsor = eventConfig.sponsorId
     ? sponsors.getSponsorById(eventConfig.sponsorId)
     : null;
+  const theme = themes.normalizeTheme(eventConfig);
   return {
     title: eventConfig.title,
     sponsorId: eventConfig.sponsorId,
     sponsorName: eventConfig.sponsorName,
     sponsorShapeCount: sponsor ? sponsor.shapeCount : 0,
-    sponsorReady: sponsor ? sponsor.shapeCount >= sponsors.MIN_SHAPES_PER_SPONSOR : false
+    sponsorReady: sponsor ? sponsor.shapeCount >= sponsors.MIN_SHAPES_PER_SPONSOR : false,
+    themePattern: theme.themePattern,
+    themeBackground: theme.themeBackground,
+    customBackgroundUrl:
+      theme.themeBackground === "custom" ? eventConfig.customBackgroundUrl || null : null,
+    circlesPanelTransparent: !!eventConfig.circlesPanelTransparent,
+    rankingPanelTransparent: !!eventConfig.rankingPanelTransparent
   };
 }
 
@@ -263,9 +291,7 @@ function buildGameStatePayload() {
     mobileShapes: game.currentRound ? game.currentRound.mobileShapes : [],
     leaderboard: getLeaderboard(),
     playerCount: players.size,
-    registrationOpen: !game.started || game.ended,
-    eventBranding: getEventPayload(),
-    eventConfig: getEventPayload()
+    registrationOpen: !game.started || game.ended
   };
 }
 
@@ -349,6 +375,9 @@ app.use("/flags", express.static(path.join(__dirname, "node_modules/flag-icons/f
 app.use("/sponsor-shapes", express.static(sponsors.SPONSORS_DIR, {
   maxAge: IS_PRODUCTION ? "1d" : 0
 }));
+app.use("/event-backgrounds", express.static(BACKGROUNDS_DIR, {
+  maxAge: IS_PRODUCTION ? "1h" : 0
+}));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -367,13 +396,83 @@ app.get("/mobile", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "mobile.html"));
 });
 
+app.get("/api/themes", (_req, res) => {
+  res.json({
+    patterns: themes.GAME_PATTERNS,
+    backgrounds: themes.GAME_BACKGROUNDS,
+    presets: themes.THEME_PRESETS,
+    defaults: {
+      pattern: themes.DEFAULT_PATTERN,
+      background: themes.DEFAULT_BACKGROUND
+    }
+  });
+});
+
 app.get("/api/event-branding", (_req, res) => {
   res.json(getEventPayload());
+});
+
+app.patch("/api/event-branding/theme", (req, res) => {
+  const pattern = String(req.body?.themePattern || "").trim();
+  const background = String(req.body?.themeBackground || "").trim();
+
+  if (pattern && themes.isValidPattern(pattern)) {
+    eventConfig.themePattern = pattern;
+  }
+
+  if (background === "custom") {
+    eventConfig.themeBackground = "custom";
+  } else if (background && themes.isValidBackground(background) && background !== "custom") {
+    eventConfig.themeBackground = background;
+    eventConfig.customBackgroundUrl = null;
+    for (const file of fs.readdirSync(BACKGROUNDS_DIR)) {
+      if (/^event-background\.(png|jpe?g|webp)$/i.test(file)) {
+        try {
+          fs.unlinkSync(path.join(BACKGROUNDS_DIR, file));
+        } catch (_error) {
+          // Ignore delete errors.
+        }
+      }
+    }
+  }
+
+  eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
+  const payload = getEventPayload();
+  io.emit("eventBranding", payload);
+  res.json(payload);
+});
+
+app.post("/api/event-background", backgroundUpload.single("background"), (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "Upload a JPG, PNG, or WebP image." });
+      return;
+    }
+    const ext = path.extname(req.file.filename).toLowerCase() || ".jpg";
+    const url = `/event-backgrounds/event-background${ext}`;
+    eventConfig.customBackgroundUrl = url;
+    eventConfig.themeBackground = "custom";
+    eventBrandingStore.writeEventConfig(eventConfig);
+    const payload = getEventPayload();
+    io.emit("eventBranding", payload);
+    res.json(payload);
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Could not save background." });
+  }
 });
 
 app.put("/api/event-branding", (req, res) => {
   const title = String(req.body?.title || "").trim().slice(0, 80);
   const sponsorId = String(req.body?.sponsorId || "").trim();
+  const incomingCustomUrl = req.body?.customBackgroundUrl || null;
+  const theme = themes.normalizeTheme({
+    themePattern: req.body?.themePattern,
+    themeBackground: req.body?.themeBackground,
+    customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl
+  });
+  const customBackgroundUrl = theme.themeBackground === "custom"
+    ? (incomingCustomUrl || eventConfig.customBackgroundUrl)
+    : null;
 
   if (!title) {
     res.status(400).json({ error: "Event title is required." });
@@ -381,6 +480,10 @@ app.put("/api/event-branding", (req, res) => {
   }
   if (!sponsorId) {
     res.status(400).json({ error: "Please choose a sponsor shape pack." });
+    return;
+  }
+  if (!themes.isValidPattern(req.body?.themePattern)) {
+    res.status(400).json({ error: "Please choose a game screen layout." });
     return;
   }
 
@@ -401,11 +504,16 @@ app.put("/api/event-branding", (req, res) => {
   }
 
   sponsors.setActiveSponsorId(sponsorId);
-  eventConfig = {
+  eventConfig = eventBrandingStore.writeEventConfig({
     title,
     sponsorId: sponsor.id,
-    sponsorName: sponsor.name
-  };
+    sponsorName: sponsor.name,
+    themePattern: theme.themePattern,
+    themeBackground: theme.themeBackground,
+    customBackgroundUrl,
+    circlesPanelTransparent: !!req.body?.circlesPanelTransparent,
+    rankingPanelTransparent: !!req.body?.rankingPanelTransparent
+  });
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
   emitGameState();
