@@ -53,23 +53,6 @@
               <input id="customBackgroundInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
               <span id="customBackgroundStatus" class="setup-hint"></span>
             </div>
-            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-panel hidden">
-              <h4 class="custom-bg-adjust-title">Adjust uploaded background</h4>
-              <p class="custom-bg-adjust-hint">Drag sliders to position and zoom your image on the live preview, lobby, and game screen.</p>
-              <div class="custom-bg-adjust-row">
-                <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
-                <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
-              </div>
-              <div class="custom-bg-adjust-row">
-                <label for="bgPosY">Vertical position <output id="bgPosYValue">50</output>%</label>
-                <input type="range" id="bgPosY" min="-50" max="150" value="50" step="1">
-              </div>
-              <div class="custom-bg-adjust-row">
-                <label for="bgScale">Zoom <output id="bgScaleValue">100</output>%</label>
-                <input type="range" id="bgScale" min="25" max="500" value="100" step="5">
-              </div>
-              <button type="button" id="resetBgAdjustBtn" class="custom-bg-adjust-reset">Reset position &amp; zoom</button>
-            </div>
           </div>
 
           <div class="setup-section">
@@ -137,6 +120,35 @@
                   <li class="rank-item"><div class="leaderboard-row"><div class="rank-badge"><span class="rank-num">2</span></div><div class="rank-player"><span class="player-name">Sam</span></div><div class="rank-score"><span class="rank-score-num">4</span></div></div></li>
                 </ul>
               </aside>
+            </div>
+          </div>
+
+          <div id="customBackgroundAdjustSection" class="custom-bg-adjust-section hidden">
+            <p class="setup-preview-label">Background — position &amp; zoom (live)</p>
+            <div
+              id="backgroundAdjustPreview"
+              class="background-adjust-preview"
+              data-bg="midnight"
+              data-pattern="classic"
+              aria-label="Live background preview"
+            >
+              <div class="background-adjust-preview-mesh bg-mesh" aria-hidden="true"></div>
+              <p class="background-adjust-preview-caption">What players see behind the game — adjust with sliders below</p>
+            </div>
+            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls">
+              <div class="custom-bg-adjust-row">
+                <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
+                <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
+              </div>
+              <div class="custom-bg-adjust-row">
+                <label for="bgPosY">Vertical position <output id="bgPosYValue">50</output>%</label>
+                <input type="range" id="bgPosY" min="-50" max="150" value="50" step="1">
+              </div>
+              <div class="custom-bg-adjust-row">
+                <label for="bgScale">Zoom <output id="bgScaleValue">100</output>%</label>
+                <input type="range" id="bgScale" min="25" max="500" value="100" step="5">
+              </div>
+              <button type="button" id="resetBgAdjustBtn" class="custom-bg-adjust-reset">Reset position &amp; zoom</button>
             </div>
           </div>
 
@@ -307,6 +319,8 @@
     const selectedPatternBadge = document.getElementById("selectedPatternBadge");
     const customBackgroundInput = document.getElementById("customBackgroundInput");
     const clearCustomBackgroundBtn = document.getElementById("clearCustomBackgroundBtn");
+    const customBackgroundAdjustSection = document.getElementById("customBackgroundAdjustSection");
+    const backgroundAdjustPreview = document.getElementById("backgroundAdjustPreview");
     const customBackgroundAdjustPanel = document.getElementById("customBackgroundAdjustPanel");
     const bgPosXInput = document.getElementById("bgPosX");
     const bgPosYInput = document.getElementById("bgPosY");
@@ -451,16 +465,38 @@
       if (bgScaleValue) bgScaleValue.textContent = String(customBackgroundScale);
     }
 
+    function isSetupCustomizeView() {
+      return hostPinnedView === "setup" && setupPhase === "customize";
+    }
+
     function updateCustomBackgroundAdjustPanel() {
-      if (!customBackgroundAdjustPanel) return;
       const show = selectedThemeBackground === "custom" && !!customBackgroundUrl;
-      customBackgroundAdjustPanel.classList.toggle("hidden", !show);
+      if (customBackgroundAdjustSection) {
+        customBackgroundAdjustSection.classList.toggle("hidden", !show);
+      }
+      document.body.classList.toggle("host-editing-custom-bg", show && isSetupCustomizeView());
+    }
+
+    function getThemeApplyTargets(includePageChrome) {
+      const targets = [];
+      if (includePageChrome) {
+        targets.push(document.documentElement, document.body);
+      }
+      if (setupLiveDemo) targets.push(setupLiveDemo);
+      if (backgroundAdjustPreview) targets.push(backgroundAdjustPreview);
+      return targets;
+    }
+
+    function syncBackgroundAdjustPreviewDataset() {
+      if (!backgroundAdjustPreview) return;
+      backgroundAdjustPreview.dataset.pattern = selectedThemePattern || "classic";
+      backgroundAdjustPreview.dataset.bg = selectedThemeBackground || "midnight";
     }
 
     function applyCustomBackgroundTransform() {
-      const targets = [document.documentElement, document.body];
-      if (setupLiveDemo) targets.push(setupLiveDemo);
       const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const pageChrome = !isSetupCustomizeView() || !isCustom;
+      const targets = getThemeApplyTargets(pageChrome);
 
       for (const el of targets) {
         if (isCustom) {
@@ -473,6 +509,16 @@
           el.style.removeProperty("--custom-bg-size");
         }
       }
+
+      if (isSetupCustomizeView() && isCustom) {
+        document.documentElement.style.removeProperty("--custom-bg-url");
+        document.body.style.removeProperty("--custom-bg-url");
+        document.body.style.removeProperty("--custom-bg-pos-x");
+        document.body.style.removeProperty("--custom-bg-pos-y");
+        document.body.style.removeProperty("--custom-bg-size");
+      }
+
+      syncBackgroundAdjustPreviewDataset();
       updateCustomBackgroundAdjustPanel();
     }
 
@@ -521,33 +567,56 @@
         customBackgroundUrl = null;
       }
 
+      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const editingInDashboard = isSetupCustomizeView() && isCustom;
+      const pageBg = editingInDashboard
+        ? (PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight")
+        : selectedThemeBackground;
+
       document.body.dataset.pattern = selectedThemePattern || "classic";
-      document.body.dataset.bg = selectedThemeBackground;
+      document.body.dataset.bg = pageBg;
 
-      document.documentElement.style.removeProperty("--custom-bg-url");
-      document.body.style.removeProperty("--custom-bg-url");
-      if (setupLiveDemo) setupLiveDemo.style.removeProperty("--custom-bg-url");
+      const themeTargets = getThemeApplyTargets(!editingInDashboard);
+      for (const el of themeTargets) {
+        el.style.removeProperty("--custom-bg-url");
+      }
+      if (editingInDashboard) {
+        document.documentElement.style.removeProperty("--custom-bg-url");
+        document.body.style.removeProperty("--custom-bg-url");
+      }
 
-      if (selectedThemeBackground === "custom" && customBackgroundUrl) {
+      if (isCustom) {
         const bustUrl = customBgDisplayUrl(
           customBackgroundUrl,
           cacheVersion || null
         );
         const urlValue = `url("${bustUrl}")`;
-        document.documentElement.style.setProperty("--custom-bg-url", urlValue);
-        document.body.style.setProperty("--custom-bg-url", urlValue);
-        if (setupLiveDemo) setupLiveDemo.style.setProperty("--custom-bg-url", urlValue);
+        const previewTargets = [setupLiveDemo, backgroundAdjustPreview].filter(Boolean);
+        if (!editingInDashboard) {
+          previewTargets.unshift(document.documentElement, document.body);
+        }
+        for (const el of previewTargets) {
+          el.style.setProperty("--custom-bg-url", urlValue);
+        }
       }
 
-      document.querySelectorAll(".bg-mesh").forEach((layer) => {
+      document.querySelectorAll("body > .bg-mesh").forEach((layer) => {
         layer.style.removeProperty("background");
         layer.style.removeProperty("background-image");
       });
+      if (backgroundAdjustPreview) {
+        const previewMesh = backgroundAdjustPreview.querySelector(".bg-mesh");
+        if (previewMesh) {
+          previewMesh.style.removeProperty("background");
+          previewMesh.style.removeProperty("background-image");
+        }
+      }
 
       if (setupLiveDemo) {
         setupLiveDemo.dataset.pattern = selectedThemePattern || "classic";
         setupLiveDemo.dataset.bg = selectedThemeBackground;
       }
+      syncBackgroundAdjustPreviewDataset();
 
       if (selectedPatternBadge && selectedThemePattern) {
         const p = themeCatalog.patterns.find((x) => x.id === selectedThemePattern);
@@ -693,6 +762,7 @@
         eventCustomizePanel?.classList.add("hidden");
         showSponsorEditMode();
       }
+      applyCustomBackgroundTransform();
     }
 
     function enterPattern(patternId) {
@@ -1255,6 +1325,7 @@
         if (customBackgroundStatus) customBackgroundStatus.textContent = "Custom background applied.";
         updateClearBackgroundButton();
         updateSetupPreview();
+        customBackgroundAdjustSection?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } catch (err) {
         if (customBackgroundStatus) customBackgroundStatus.textContent = err.message || "Could not upload.";
       }

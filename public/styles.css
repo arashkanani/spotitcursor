@@ -1887,29 +1887,64 @@ input::placeholder {
   cursor: wait;
 }
 
-.custom-bg-adjust-panel {
-  margin-top: 1rem;
+.custom-bg-adjust-section {
+  margin-top: 1.25rem;
+  padding-top: 0.25rem;
+}
+
+.custom-bg-adjust-section.hidden {
+  display: none;
+}
+
+.background-adjust-preview {
+  position: relative;
+  width: 100%;
+  height: min(36vw, 300px);
+  min-height: 220px;
+  margin: 0 0 1rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-glass);
+  background: #060912;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.35);
+}
+
+.background-adjust-preview .background-adjust-preview-mesh {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.background-adjust-preview-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.88);
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.72));
+  pointer-events: none;
+}
+
+.custom-bg-adjust-controls {
   padding: 1rem 1.1rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-glass);
   background: rgba(0, 0, 0, 0.28);
 }
 
-.custom-bg-adjust-panel.hidden {
-  display: none;
+body.host-editing-custom-bg > .bg-mesh {
+  background:
+    linear-gradient(165deg, #060912 0%, #0d1428 50%, #121c36 100%) !important;
+  background-image: none !important;
 }
 
-.custom-bg-adjust-title {
-  margin: 0 0 0.35rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.custom-bg-adjust-hint {
-  margin: 0 0 0.85rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+body.host-editing-custom-bg > .bg-vignette {
+  opacity: 0.35;
 }
 
 .custom-bg-adjust-row {
