@@ -78,12 +78,16 @@
 
     function applyMobileTheme(branding) {
       let bg = branding?.themeBackground || "midnight";
-      const customUrl = branding?.customBackgroundUrl || null;
-      if (bg === "custom" && !customUrl) bg = "midnight";
+      const rawUrl = branding?.customBackgroundUrl || null;
+      if (bg === "custom" && !rawUrl) bg = "midnight";
       document.body.dataset.bg = bg;
       document.body.dataset.pattern = branding?.themePattern || "classic";
-      if (bg === "custom" && customUrl) {
-        document.body.style.setProperty("--custom-bg-url", `url("${customUrl}")`);
+      if (bg === "custom" && rawUrl) {
+        const base = String(rawUrl).split("?")[0];
+        const v = branding?.updatedAt
+          ? new Date(branding.updatedAt).getTime()
+          : Date.now();
+        document.body.style.setProperty("--custom-bg-url", `url("${base}?v=${v}")`);
       } else {
         document.body.style.removeProperty("--custom-bg-url");
       }

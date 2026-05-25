@@ -383,12 +383,28 @@
       cinema: "emerald"
     };
 
-    function applyGameTheme(pattern, background, customUrl) {
+    function stripBackgroundUrlQuery(url) {
+      if (!url) return null;
+      return String(url).split("?")[0] || null;
+    }
+
+    function customBgDisplayUrl(url, cacheVersion) {
+      const base = stripBackgroundUrlQuery(url);
+      if (!base) return null;
+      const v = cacheVersion
+        ? new Date(cacheVersion).getTime()
+        : Date.now();
+      return `${base}?v=${v}`;
+    }
+
+    function applyGameTheme(pattern, background, customUrl, cacheVersion) {
       if (pattern) selectedThemePattern = pattern;
       if (background) selectedThemeBackground = background;
 
       if (selectedThemeBackground === "custom") {
-        if (customUrl !== undefined) customBackgroundUrl = customUrl;
+        if (customUrl !== undefined) {
+          customBackgroundUrl = stripBackgroundUrlQuery(customUrl);
+        }
       } else {
         customBackgroundUrl = null;
       }
@@ -401,7 +417,11 @@
       if (setupLiveDemo) setupLiveDemo.style.removeProperty("--custom-bg-url");
 
       if (selectedThemeBackground === "custom" && customBackgroundUrl) {
-        const urlValue = `url("${customBackgroundUrl}")`;
+        const bustUrl = customBgDisplayUrl(
+          customBackgroundUrl,
+          cacheVersion || null
+        );
+        const urlValue = `url("${bustUrl}")`;
         document.documentElement.style.setProperty("--custom-bg-url", urlValue);
         document.body.style.setProperty("--custom-bg-url", urlValue);
         if (setupLiveDemo) setupLiveDemo.style.setProperty("--custom-bg-url", urlValue);
@@ -698,7 +718,12 @@
       if (bg === "custom" && !customUrl) {
         bg = PATTERN_DEFAULT_BG[branding?.themePattern] || "midnight";
       }
-      applyGameTheme(branding?.themePattern, bg, customUrl);
+      applyGameTheme(
+        branding?.themePattern,
+        bg,
+        customUrl,
+        branding?.updatedAt || null
+      );
       applyPanelStyle(branding);
       if (branding?.themePattern) {
         showSetupPhase("customize");

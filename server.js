@@ -50,7 +50,7 @@ function repairEventConfig(config) {
   const customUrl = String(next.customBackgroundUrl || "").trim();
 
   if (next.themeBackground === "custom" && customUrl) {
-    const filePath = path.join(BACKGROUNDS_DIR, path.basename(customUrl));
+    const filePath = path.join(BACKGROUNDS_DIR, path.basename(eventBrandingStore.stripBackgroundUrlQuery(customUrl)));
     if (!fs.existsSync(filePath)) {
       next.customBackgroundUrl = null;
       next.themeBackground = themes.defaultBackgroundForPattern(next.themePattern);
@@ -236,7 +236,13 @@ function getEventPayload() {
     themePattern: theme.themePattern,
     themeBackground: theme.themeBackground,
     customBackgroundUrl:
-      theme.themeBackground === "custom" ? eventConfig.customBackgroundUrl || null : null,
+      theme.themeBackground === "custom"
+        ? eventBrandingStore.withBackgroundCacheBuster(
+          eventConfig.customBackgroundUrl,
+          eventConfig.updatedAt
+        )
+        : null,
+    updatedAt: eventConfig.updatedAt || null,
     circlesPanelTransparent: !!eventConfig.circlesPanelTransparent,
     rankingPanelTransparent: !!eventConfig.rankingPanelTransparent
   };
@@ -447,10 +453,11 @@ app.get("/api/event-branding", (_req, res) => {
   res.json(getEventPayload());
 });
 
-function clearStoredCustomBackgroundFiles() {
+function clearStoredCustomBackgroundFiles(keepFilename) {
   if (!fs.existsSync(BACKGROUNDS_DIR)) return;
   for (const file of fs.readdirSync(BACKGROUNDS_DIR)) {
     if (/^event-background\.(png|jpe?g|webp)$/i.test(file)) {
+      if (keepFilename && file === keepFilename) continue;
       try {
         fs.unlinkSync(path.join(BACKGROUNDS_DIR, file));
       } catch (_error) {
@@ -503,11 +510,14 @@ app.post("/api/event-background", backgroundUpload.single("background"), (req, r
       res.status(400).json({ error: "Upload a JPG, PNG, or WebP image." });
       return;
     }
+    clearStoredCustomBackgroundFiles(req.file.filename);
     const ext = path.extname(req.file.filename).toLowerCase() || ".jpg";
     const url = `/event-backgrounds/event-background${ext}`;
-    eventConfig.customBackgroundUrl = url;
-    eventConfig.themeBackground = "custom";
-    eventBrandingStore.writeEventConfig(eventConfig);
+    eventConfig = eventBrandingStore.writeEventConfig({
+      ...eventConfig,
+      customBackgroundUrl: url,
+      themeBackground: "custom"
+    });
     const payload = getEventPayload();
     io.emit("eventBranding", payload);
     res.json(payload);
