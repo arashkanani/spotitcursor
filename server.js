@@ -40,11 +40,40 @@ const ROUND_WINNER_OVERLAY_DURATION_MS = 4000;
 const ROUND_WINNER_DISPLAY_MS = ROUND_WINNER_OVERLAY_DELAY_MS + ROUND_WINNER_OVERLAY_DURATION_MS;
 const MISTAKES_PER_ROUND = 3;
 
-let eventConfig = eventBrandingStore.readEventConfig();
-
 const { DATA_DIR } = require("./lib/config");
 const BACKGROUNDS_DIR = path.join(DATA_DIR, "backgrounds");
 fs.mkdirSync(BACKGROUNDS_DIR, { recursive: true });
+
+function repairEventConfig(config) {
+  const next = { ...config };
+  let changed = false;
+  const customUrl = String(next.customBackgroundUrl || "").trim();
+
+  if (next.themeBackground === "custom" && customUrl) {
+    const filePath = path.join(BACKGROUNDS_DIR, path.basename(customUrl));
+    if (!fs.existsSync(filePath)) {
+      next.customBackgroundUrl = null;
+      next.themeBackground = themes.defaultBackgroundForPattern(next.themePattern);
+      changed = true;
+    }
+  }
+
+  const theme = themes.normalizeTheme(next);
+  if (theme.themePattern !== next.themePattern || theme.themeBackground !== next.themeBackground) {
+    next.themePattern = theme.themePattern;
+    next.themeBackground = theme.themeBackground;
+    changed = true;
+  }
+
+  if (theme.themeBackground !== "custom" && next.customBackgroundUrl) {
+    next.customBackgroundUrl = null;
+    changed = true;
+  }
+
+  return changed ? eventBrandingStore.writeEventConfig(next) : next;
+}
+
+let eventConfig = repairEventConfig(eventBrandingStore.readEventConfig());
 
 const backgroundUpload = multer({
   storage: multer.diskStorage({
@@ -378,7 +407,11 @@ app.use("/sponsor-shapes", express.static(sponsors.SPONSORS_DIR, {
   maxAge: IS_PRODUCTION ? "1d" : 0
 }));
 app.use("/event-backgrounds", express.static(BACKGROUNDS_DIR, {
-  maxAge: IS_PRODUCTION ? "1h" : 0
+  maxAge: 0,
+  etag: false,
+  setHeaders(res) {
+    res.setHeader("Cache-Control", "no-store");
+  }
 }));
 
 app.get("/health", (_req, res) => {

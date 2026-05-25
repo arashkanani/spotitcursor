@@ -473,6 +473,7 @@
         }
         updateSetupPreview();
       } catch (err) {
+        applyGameTheme(selectedThemePattern, fallbackBg, null);
         if (customBackgroundStatus) {
           customBackgroundStatus.textContent = err.message || "Could not remove upload.";
         }
@@ -690,8 +691,13 @@
       if (branding?.sponsorId) {
         selectedSponsorId = branding.sponsorId;
       }
-      const bg = branding?.themeBackground;
-      const customUrl = bg === "custom" ? (branding?.customBackgroundUrl || null) : null;
+      let bg = branding?.themeBackground;
+      const customUrl = bg === "custom" && branding?.customBackgroundUrl
+        ? branding.customBackgroundUrl
+        : null;
+      if (bg === "custom" && !customUrl) {
+        bg = PATTERN_DEFAULT_BG[branding?.themePattern] || "midnight";
+      }
       applyGameTheme(branding?.themePattern, bg, customUrl);
       applyPanelStyle(branding);
       if (branding?.themePattern) {
@@ -1221,6 +1227,15 @@
       setupView.classList.add("hidden");
       lobbyView.classList.remove("hidden");
       gameView.classList.add("hidden");
+      let lobbyBg = selectedThemeBackground;
+      if (lobbyBg === "custom" && !customBackgroundUrl) {
+        lobbyBg = PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight";
+      }
+      applyGameTheme(
+        selectedThemePattern,
+        lobbyBg,
+        lobbyBg === "custom" ? customBackgroundUrl : null
+      );
     }
 
     function showGameView() {
@@ -1323,6 +1338,11 @@
       setupMessage.textContent = "Saving…";
       try {
         socket.emit("hostResetGame");
+        let themeBg = selectedThemeBackground;
+        if (themeBg === "custom" && !customBackgroundUrl) {
+          themeBg = PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight";
+        }
+
         const res = await fetch("/api/event-branding", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -1330,8 +1350,8 @@
             title,
             sponsorId: selectedSponsorId,
             themePattern: selectedThemePattern,
-            themeBackground: selectedThemeBackground,
-            customBackgroundUrl: selectedThemeBackground === "custom" ? customBackgroundUrl : null,
+            themeBackground: themeBg,
+            customBackgroundUrl: themeBg === "custom" ? customBackgroundUrl : null,
             circlesPanelTransparent,
             rankingPanelTransparent
           })
