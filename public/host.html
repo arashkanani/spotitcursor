@@ -90,43 +90,47 @@
           </div>
 
           <p class="setup-preview-label">Live preview — background, circles &amp; ranking</p>
-          <div id="setupLiveDemo" class="setup-live-demo setup-game-preview-panel card" data-bg="midnight" data-pattern="classic">
-            <div class="setup-preview-bg bg-mesh" aria-hidden="true"></div>
-            <div class="setup-preview-vignette" aria-hidden="true"></div>
-            <div class="setup-preview-content">
-              <header class="event-branding-bar setup-preview-bar">
-                <div class="event-branding-main">
-                  <p class="event-eyebrow">Live Event</p>
-                  <h2 class="event-title" data-event-title>Your Event Title</h2>
-                  <p class="event-sponsor-line" data-event-sponsor hidden></p>
-                </div>
-                <div class="round-pill game-status-pill demo-status-pill">
-                  <span class="game-status-round">Round 3 / 20</span>
-                  <span class="game-status-players">24 players</span>
-                </div>
-              </header>
-              <div class="demo-game-shell layout">
-                <section class="demo-game-board game-board-card card">
-                  <div class="circles">
-                    <div class="circle" id="demoLeftCircle">
-                      <div class="circle-shapes-layer"></div>
+          <div id="setupLiveDemo" class="setup-live-demo setup-game-preview-panel card" data-pattern="classic">
+            <div class="setup-preview-viewport">
+              <div id="setupPreviewScene" class="setup-preview-scene" data-bg="midnight" data-pattern="classic">
+                <div class="setup-preview-bg bg-mesh" aria-hidden="true"></div>
+                <div class="setup-preview-vignette" aria-hidden="true"></div>
+                <div class="setup-preview-scale">
+                  <header class="event-branding-bar setup-preview-bar game-branding-bar">
+                    <div class="event-branding-main">
+                      <p class="event-eyebrow">Live Event</p>
+                      <h2 class="event-title" data-event-title>Your Event Title</h2>
+                      <p class="event-sponsor-line" data-event-sponsor hidden></p>
                     </div>
-                    <div class="circle" id="demoRightCircle">
-                      <div class="circle-shapes-layer"></div>
+                    <div class="round-pill game-status-pill demo-status-pill">
+                      <span class="game-status-round">Round 3 / 20</span>
+                      <span class="game-status-players">24 players</span>
                     </div>
+                  </header>
+                  <div class="demo-game-shell layout">
+                    <section class="demo-game-board game-board-card card">
+                      <div class="circles">
+                        <div class="circle" id="demoLeftCircle">
+                          <div class="circle-shapes-layer"></div>
+                        </div>
+                        <div class="circle" id="demoRightCircle">
+                          <div class="circle-shapes-layer"></div>
+                        </div>
+                      </div>
+                    </section>
+                    <aside class="card demo-leaderboard leaderboard-panel">
+                      <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
+                      <ul class="rank-list demo-rank-list">
+                        <li class="rank-item"><div class="leaderboard-row rank-first"><div class="rank-badge"><span class="rank-medal">🥇</span></div><div class="rank-player"><span class="player-name">Alex</span></div><div class="rank-score"><span class="rank-score-num">5</span></div></div></li>
+                        <li class="rank-item"><div class="leaderboard-row"><div class="rank-badge"><span class="rank-num">2</span></div><div class="rank-player"><span class="player-name">Sam</span></div><div class="rank-score"><span class="rank-score-num">4</span></div></div></li>
+                      </ul>
+                    </aside>
                   </div>
-                </section>
-                <aside class="card demo-leaderboard leaderboard-panel">
-                  <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
-                  <ul class="rank-list demo-rank-list">
-                    <li class="rank-item"><div class="leaderboard-row rank-first"><div class="rank-badge"><span class="rank-medal">🥇</span></div><div class="rank-player"><span class="player-name">Alex</span></div><div class="rank-score"><span class="rank-score-num">5</span></div></div></li>
-                    <li class="rank-item"><div class="leaderboard-row"><div class="rank-badge"><span class="rank-num">2</span></div><div class="rank-player"><span class="player-name">Sam</span></div><div class="rank-score"><span class="rank-score-num">4</span></div></div></li>
-                  </ul>
-                </aside>
+                </div>
               </div>
             </div>
             <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls hidden">
-              <p class="custom-bg-adjust-hint">Adjust your uploaded background — preview updates above with circles and ranking.</p>
+              <p class="custom-bg-adjust-hint">Adjust position and zoom — the miniature game view above shows how the background sits behind the title, circles, and ranking.</p>
               <div class="custom-bg-adjust-row">
                 <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
                 <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
@@ -342,6 +346,11 @@
     const continueToLobbyBtn = document.getElementById("continueToLobbyBtn");
     const backgroundPicker = document.getElementById("backgroundPicker");
     const setupLiveDemo = document.getElementById("setupLiveDemo");
+    const setupPreviewScene = document.getElementById("setupPreviewScene");
+    const setupPreviewViewport = setupLiveDemo?.querySelector(".setup-preview-viewport");
+    const setupPreviewScaleEl = setupLiveDemo?.querySelector(".setup-preview-scale");
+    const SETUP_PREVIEW_REF_WIDTH = 1080;
+    const SETUP_PREVIEW_REF_HEIGHT = 620;
     const demoLeftCircle = document.getElementById("demoLeftCircle");
     const demoRightCircle = document.getElementById("demoRightCircle");
     const setupMessage = document.getElementById("setupMessage");
@@ -471,8 +480,26 @@
       if (includePageChrome) {
         targets.push(document.documentElement, document.body);
       }
-      if (setupLiveDemo) targets.push(setupLiveDemo);
+      if (setupPreviewScene) targets.push(setupPreviewScene);
       return targets;
+    }
+
+    function fitSetupPreviewScale() {
+      if (!setupPreviewViewport || !setupPreviewScaleEl) return;
+      const width = setupPreviewViewport.clientWidth;
+      if (width < 16) return;
+      const heightBudget = Math.min(
+        Math.max(240, window.innerHeight * 0.42),
+        400
+      );
+      const scale = Math.min(
+        width / SETUP_PREVIEW_REF_WIDTH,
+        heightBudget / SETUP_PREVIEW_REF_HEIGHT,
+        0.58
+      );
+      const fit = Math.max(0.34, scale);
+      setupPreviewScaleEl.style.setProperty("--preview-fit-scale", String(fit));
+      setupPreviewViewport.style.height = `${Math.ceil(SETUP_PREVIEW_REF_HEIGHT * fit)}px`;
     }
 
     function applyCustomBackgroundTransform() {
@@ -572,7 +599,7 @@
           cacheVersion || null
         );
         const urlValue = `url("${bustUrl}")`;
-        const previewTargets = setupLiveDemo ? [setupLiveDemo] : [];
+        const previewTargets = setupPreviewScene ? [setupPreviewScene] : [];
         if (!editingInDashboard) {
           previewTargets.unshift(document.documentElement, document.body);
         }
@@ -585,16 +612,20 @@
         layer.style.removeProperty("background");
         layer.style.removeProperty("background-image");
       });
-      const setupPreviewMesh = setupLiveDemo?.querySelector(".setup-preview-bg");
+      const setupPreviewMesh = setupPreviewScene?.querySelector(".setup-preview-bg");
       if (setupPreviewMesh) {
         setupPreviewMesh.style.removeProperty("background");
         setupPreviewMesh.style.removeProperty("background-image");
       }
 
+      if (setupPreviewScene) {
+        setupPreviewScene.dataset.pattern = selectedThemePattern || "classic";
+        setupPreviewScene.dataset.bg = selectedThemeBackground;
+      }
       if (setupLiveDemo) {
         setupLiveDemo.dataset.pattern = selectedThemePattern || "classic";
-        setupLiveDemo.dataset.bg = selectedThemeBackground;
       }
+      fitSetupPreviewScale();
 
       if (selectedPatternBadge && selectedThemePattern) {
         const p = themeCatalog.patterns.find((x) => x.id === selectedThemePattern);
@@ -735,6 +766,7 @@
         sponsorEditPanel?.classList.add("hidden");
         sponsorLibraryPanel?.classList.remove("hidden");
         void refreshSetupLiveDemo();
+        fitSetupPreviewScale();
       } else if (phase === "sponsor-edit") {
         patternPickerPanel?.classList.add("hidden");
         eventCustomizePanel?.classList.add("hidden");
@@ -859,6 +891,7 @@
       demoRightCircle._shapeDisplayCache = null;
       scheduleRenderShapes(demoLeftCircle, sample.slice(0, half));
       scheduleRenderShapes(demoRightCircle, sample.slice(half));
+      fitSetupPreviewScale();
     }
 
     function applyEventBranding(branding) {
@@ -2200,6 +2233,9 @@
     });
 
     window.addEventListener("resize", () => {
+      if (!setupView.classList.contains("hidden")) {
+        fitSetupPreviewScale();
+      }
       if (gameView.classList.contains("hidden")) return;
       if (!lastGameCircleShapes.left.length && !lastGameCircleShapes.right.length) return;
       refreshCircleShapesDisplay();
