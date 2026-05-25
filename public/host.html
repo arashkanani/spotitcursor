@@ -53,6 +53,23 @@
               <input id="customBackgroundInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
               <span id="customBackgroundStatus" class="setup-hint"></span>
             </div>
+            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-panel hidden">
+              <h4 class="custom-bg-adjust-title">Adjust uploaded background</h4>
+              <p class="custom-bg-adjust-hint">Drag sliders to position and zoom your image on the live preview, lobby, and game screen.</p>
+              <div class="custom-bg-adjust-row">
+                <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
+                <input type="range" id="bgPosX" min="0" max="100" value="50" step="1">
+              </div>
+              <div class="custom-bg-adjust-row">
+                <label for="bgPosY">Vertical position <output id="bgPosYValue">50</output>%</label>
+                <input type="range" id="bgPosY" min="0" max="100" value="50" step="1">
+              </div>
+              <div class="custom-bg-adjust-row">
+                <label for="bgScale">Zoom <output id="bgScaleValue">100</output>%</label>
+                <input type="range" id="bgScale" min="50" max="250" value="100" step="5">
+              </div>
+              <button type="button" id="resetBgAdjustBtn" class="custom-bg-adjust-reset">Reset position &amp; zoom</button>
+            </div>
           </div>
 
           <div class="setup-section">
@@ -290,6 +307,14 @@
     const selectedPatternBadge = document.getElementById("selectedPatternBadge");
     const customBackgroundInput = document.getElementById("customBackgroundInput");
     const clearCustomBackgroundBtn = document.getElementById("clearCustomBackgroundBtn");
+    const customBackgroundAdjustPanel = document.getElementById("customBackgroundAdjustPanel");
+    const bgPosXInput = document.getElementById("bgPosX");
+    const bgPosYInput = document.getElementById("bgPosY");
+    const bgScaleInput = document.getElementById("bgScale");
+    const bgPosXValue = document.getElementById("bgPosXValue");
+    const bgPosYValue = document.getElementById("bgPosYValue");
+    const bgScaleValue = document.getElementById("bgScaleValue");
+    const resetBgAdjustBtn = document.getElementById("resetBgAdjustBtn");
     const customBackgroundStatus = document.getElementById("customBackgroundStatus");
     const circlesPanelTransparentInput = document.getElementById("circlesPanelTransparent");
     const rankingPanelTransparentInput = document.getElementById("rankingPanelTransparent");
@@ -371,6 +396,10 @@
     let selectedThemePattern = null;
     let selectedThemeBackground = "midnight";
     let customBackgroundUrl = null;
+    let customBackgroundPosX = 50;
+    let customBackgroundPosY = 50;
+    let customBackgroundScale = 100;
+    let bgAdjustPersistTimer = null;
     let circlesPanelTransparent = false;
     let rankingPanelTransparent = false;
     let setupPhase = "patterns";
@@ -386,6 +415,84 @@
     function stripBackgroundUrlQuery(url) {
       if (!url) return null;
       return String(url).split("?")[0] || null;
+    }
+
+    function clampBgPercent(value, fallback = 50) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(100, Math.max(0, Math.round(n)));
+    }
+
+    function clampBgScale(value, fallback = 100) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(250, Math.max(50, Math.round(n)));
+    }
+
+    function getBackgroundTransformPayload() {
+      return {
+        customBackgroundPosX,
+        customBackgroundPosY,
+        customBackgroundScale
+      };
+    }
+
+    function syncBgAdjustControls() {
+      if (bgPosXInput) bgPosXInput.value = String(customBackgroundPosX);
+      if (bgPosYInput) bgPosYInput.value = String(customBackgroundPosY);
+      if (bgScaleInput) bgScaleInput.value = String(customBackgroundScale);
+      if (bgPosXValue) bgPosXValue.textContent = String(customBackgroundPosX);
+      if (bgPosYValue) bgPosYValue.textContent = String(customBackgroundPosY);
+      if (bgScaleValue) bgScaleValue.textContent = String(customBackgroundScale);
+    }
+
+    function updateCustomBackgroundAdjustPanel() {
+      if (!customBackgroundAdjustPanel) return;
+      const show = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      customBackgroundAdjustPanel.classList.toggle("hidden", !show);
+    }
+
+    function applyCustomBackgroundTransform() {
+      const targets = [document.documentElement, document.body];
+      if (setupLiveDemo) targets.push(setupLiveDemo);
+      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+
+      for (const el of targets) {
+        if (isCustom) {
+          el.style.setProperty("--custom-bg-pos-x", `${customBackgroundPosX}%`);
+          el.style.setProperty("--custom-bg-pos-y", `${customBackgroundPosY}%`);
+          el.style.setProperty("--custom-bg-size", `${customBackgroundScale}% auto`);
+        } else {
+          el.style.removeProperty("--custom-bg-pos-x");
+          el.style.removeProperty("--custom-bg-pos-y");
+          el.style.removeProperty("--custom-bg-size");
+        }
+      }
+      updateCustomBackgroundAdjustPanel();
+    }
+
+    function setBackgroundTransform(transform, options = {}) {
+      if (transform.customBackgroundPosX !== undefined) {
+        customBackgroundPosX = clampBgPercent(transform.customBackgroundPosX);
+      }
+      if (transform.customBackgroundPosY !== undefined) {
+        customBackgroundPosY = clampBgPercent(transform.customBackgroundPosY);
+      }
+      if (transform.customBackgroundScale !== undefined) {
+        customBackgroundScale = clampBgScale(transform.customBackgroundScale);
+      }
+      syncBgAdjustControls();
+      applyCustomBackgroundTransform();
+      if (options.persist) schedulePersistBackgroundAdjust();
+      if (options.refreshPreview) updateSetupPreview();
+    }
+
+    function schedulePersistBackgroundAdjust() {
+      if (bgAdjustPersistTimer) clearTimeout(bgAdjustPersistTimer);
+      bgAdjustPersistTimer = setTimeout(() => {
+        bgAdjustPersistTimer = null;
+        void persistThemeSelection();
+      }, 400);
     }
 
     function customBgDisplayUrl(url, cacheVersion) {
@@ -442,6 +549,7 @@
         selectedPatternBadge.textContent = p ? p.name : selectedThemePattern;
       }
 
+      applyCustomBackgroundTransform();
       syncThemePickerUi();
       updateClearBackgroundButton();
     }
@@ -511,7 +619,8 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             themePattern: selectedThemePattern,
-            themeBackground: selectedThemeBackground
+            themeBackground: selectedThemeBackground,
+            ...getBackgroundTransformPayload()
           })
         });
       } catch (_err) {
@@ -711,6 +820,11 @@
       if (branding?.sponsorId) {
         selectedSponsorId = branding.sponsorId;
       }
+      setBackgroundTransform({
+        customBackgroundPosX: branding?.customBackgroundPosX,
+        customBackgroundPosY: branding?.customBackgroundPosY,
+        customBackgroundScale: branding?.customBackgroundScale
+      });
       let bg = branding?.themeBackground;
       const customUrl = bg === "custom" && branding?.customBackgroundUrl
         ? branding.customBackgroundUrl
@@ -1102,6 +1216,26 @@
       void clearCustomBackground();
     });
 
+    function onBgAdjustInput() {
+      setBackgroundTransform({
+        customBackgroundPosX: bgPosXInput?.value,
+        customBackgroundPosY: bgPosYInput?.value,
+        customBackgroundScale: bgScaleInput?.value
+      }, { persist: true, refreshPreview: true });
+    }
+
+    bgPosXInput?.addEventListener("input", onBgAdjustInput);
+    bgPosYInput?.addEventListener("input", onBgAdjustInput);
+    bgScaleInput?.addEventListener("input", onBgAdjustInput);
+
+    resetBgAdjustBtn?.addEventListener("click", () => {
+      setBackgroundTransform({
+        customBackgroundPosX: 50,
+        customBackgroundPosY: 50,
+        customBackgroundScale: 100
+      }, { persist: true, refreshPreview: true });
+    });
+
     customBackgroundInput?.addEventListener("change", async () => {
       const file = customBackgroundInput.files?.[0];
       if (!file) return;
@@ -1377,6 +1511,7 @@
             themePattern: selectedThemePattern,
             themeBackground: themeBg,
             customBackgroundUrl: themeBg === "custom" ? customBackgroundUrl : null,
+            ...getBackgroundTransformPayload(),
             circlesPanelTransparent,
             rankingPanelTransparent
           })

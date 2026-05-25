@@ -243,6 +243,9 @@ function getEventPayload() {
         )
         : null,
     updatedAt: eventConfig.updatedAt || null,
+    customBackgroundPosX: eventConfig.customBackgroundPosX ?? eventBrandingStore.DEFAULT_BG_POS,
+    customBackgroundPosY: eventConfig.customBackgroundPosY ?? eventBrandingStore.DEFAULT_BG_POS,
+    customBackgroundScale: eventConfig.customBackgroundScale ?? eventBrandingStore.DEFAULT_BG_SCALE,
     circlesPanelTransparent: !!eventConfig.circlesPanelTransparent,
     rankingPanelTransparent: !!eventConfig.rankingPanelTransparent
   };
@@ -470,6 +473,7 @@ function clearStoredCustomBackgroundFiles(keepFilename) {
 app.patch("/api/event-branding/theme", (req, res) => {
   const pattern = String(req.body?.themePattern || "").trim();
   const background = String(req.body?.themeBackground || "").trim();
+  const bgTransform = eventBrandingStore.parseBgTransform(req.body);
 
   if (pattern && themes.isValidPattern(pattern)) {
     eventConfig.themePattern = pattern;
@@ -481,6 +485,14 @@ app.patch("/api/event-branding/theme", (req, res) => {
     eventConfig.themeBackground = background;
     eventConfig.customBackgroundUrl = null;
     clearStoredCustomBackgroundFiles();
+  }
+
+  if (req.body?.customBackgroundPosX !== undefined
+    || req.body?.customBackgroundPosY !== undefined
+    || req.body?.customBackgroundScale !== undefined) {
+    eventConfig.customBackgroundPosX = bgTransform.customBackgroundPosX;
+    eventConfig.customBackgroundPosY = bgTransform.customBackgroundPosY;
+    eventConfig.customBackgroundScale = bgTransform.customBackgroundScale;
   }
 
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
@@ -569,6 +581,7 @@ app.put("/api/event-branding", (req, res) => {
   }
 
   sponsors.setActiveSponsorId(sponsorId);
+  const bgTransform = eventBrandingStore.parseBgTransform(req.body);
   eventConfig = eventBrandingStore.writeEventConfig({
     title,
     sponsorId: sponsor.id,
@@ -576,6 +589,7 @@ app.put("/api/event-branding", (req, res) => {
     themePattern: theme.themePattern,
     themeBackground: theme.themeBackground,
     customBackgroundUrl,
+    ...bgTransform,
     circlesPanelTransparent: !!req.body?.circlesPanelTransparent,
     rankingPanelTransparent: !!req.body?.rankingPanelTransparent
   });
