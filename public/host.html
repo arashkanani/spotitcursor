@@ -139,8 +139,8 @@
                 </div>
               </div>
             </div>
-            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls hidden">
-              <p class="custom-bg-adjust-hint">Adjust position and zoom — the preview above is a scaled copy of the live game screen (same size as your display, shown at ¼ scale).</p>
+            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls">
+              <p class="custom-bg-adjust-hint" id="customBgAdjustHint">Upload a custom background above to adjust position and zoom. The live preview updates as you change settings.</p>
               <div class="custom-bg-adjust-row">
                 <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
                 <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
@@ -479,11 +479,34 @@
     }
 
     function updateCustomBackgroundAdjustPanel() {
-      const show = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const hasCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const onDashboard = isSetupCustomizeView();
       if (customBackgroundAdjustPanel) {
-        customBackgroundAdjustPanel.classList.toggle("hidden", !show);
+        customBackgroundAdjustPanel.classList.toggle("hidden", !onDashboard);
+        customBackgroundAdjustPanel.classList.toggle("is-inactive", onDashboard && !hasCustom);
+        customBackgroundAdjustPanel.querySelectorAll("input[type='range'], button").forEach((el) => {
+          el.disabled = !hasCustom;
+        });
       }
-      document.body.classList.toggle("host-editing-custom-bg", show && isSetupCustomizeView());
+      const hint = document.getElementById("customBgAdjustHint");
+      if (hint) {
+        hint.textContent = hasCustom
+          ? "Adjust position and zoom — the preview above is a scaled copy of the live game screen (same size as your display, shown at ¼ scale)."
+          : "Upload a custom background above to adjust position and zoom. Preset backgrounds use the color swatches only.";
+      }
+      document.body.classList.toggle("host-editing-custom-bg", hasCustom && onDashboard);
+    }
+
+    function refreshDashboardPreview() {
+      if (setupPhase !== "customize") return;
+      try {
+        applyPreviewBackgroundLayer();
+        paintAllCustomBackgroundMeshes();
+        fitSetupPreviewScale();
+      } catch (err) {
+        console.error("refreshDashboardPreview failed", err);
+      }
+      void refreshSetupLiveDemo();
     }
 
     function getThemeApplyTargets(includePageChrome) {
@@ -510,8 +533,13 @@
       setupPreviewScene.style.width = `${ref.width}px`;
       setupPreviewScene.style.height = `${ref.height}px`;
 
-      const panelWidth = setupPreviewViewport.clientWidth;
-      if (panelWidth < 16) return;
+      const panelWidth = setupPreviewViewport.clientWidth
+        || setupLiveDemo?.clientWidth
+        || 400;
+      if (panelWidth < 16) {
+        setupPreviewViewport.style.minHeight = "240px";
+        return;
+      }
       const heightBudget = Math.min(
         Math.max(200, window.innerHeight * 0.38),
         380
@@ -736,6 +764,7 @@
       syncThemePickerUi();
       updateClearBackgroundButton();
       updateCustomUploadSwatch();
+      if (isSetupCustomizeView()) refreshDashboardPreview();
     }
 
     function updateClearBackgroundButton() {
@@ -882,10 +911,7 @@
         eventCustomizePanel?.classList.remove("hidden");
         sponsorEditPanel?.classList.add("hidden");
         sponsorLibraryPanel?.classList.remove("hidden");
-        requestAnimationFrame(() => {
-          void refreshSetupLiveDemo();
-          fitSetupPreviewScale();
-        });
+        requestAnimationFrame(() => refreshDashboardPreview());
       } else if (phase === "sponsor-edit") {
         patternPickerPanel?.classList.add("hidden");
         eventCustomizePanel?.classList.add("hidden");
@@ -931,6 +957,7 @@
       const pid = patternId || selectedThemePattern || "classic";
       showSetupPhase("customize");
       enterPattern(pid, { quiet: true });
+      requestAnimationFrame(() => refreshDashboardPreview());
     }
 
     function enterPattern(patternId, options = {}) {
@@ -1034,6 +1061,7 @@
           if (customBackgroundStatus) customBackgroundStatus.textContent = "";
           await persistThemeSelection();
           updateSetupPreview();
+          refreshDashboardPreview();
         });
         backgroundPicker.appendChild(btn);
       }
@@ -1055,6 +1083,7 @@
         }
         applyGameTheme(selectedThemePattern, "custom", customBackgroundUrl);
         updateSetupPreview();
+        refreshDashboardPreview();
       });
       backgroundPicker.appendChild(customBtn);
 
@@ -1062,26 +1091,33 @@
       updateCustomUploadSwatch();
     }
 
-    async function refreshSetupLiveDemo() {
-      const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
-      if (!sponsor || !demoLeftCircle || !demoRightCircle) return;
+    const DEMO_FALLBACK_SHAPES = [
+      "circle", "star", "heart", "bolt", "moon", "sun", "diamond", "cloud", "key", "gift"
+    ];
 
-      let urls = sponsor.previewShapes || [];
-      if (sponsor.ready) {
-        try {
-          const res = await fetch(`/api/sponsors/${encodeURIComponent(sponsor.id)}`);
-          if (res.ok) {
-            const detail = await res.json();
-            urls = detail.shapes || urls;
+    async function refreshSetupLiveDemo() {
+      if (!demoLeftCircle || !demoRightCircle) return;
+
+      let urls = [];
+      const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
+      if (sponsor) {
+        urls = sponsor.previewShapes || [];
+        if (sponsor.ready) {
+          try {
+            const res = await fetch(`/api/sponsors/${encodeURIComponent(sponsor.id)}`);
+            if (res.ok) {
+              const detail = await res.json();
+              urls = detail.shapes || urls;
+            }
+          } catch (_err) {
+            // Use preview thumbnails only.
           }
-        } catch (_err) {
-          // Use preview thumbnails only.
         }
       }
 
-      const sample = urls.length >= 6
+      const sample = urls.length >= 2
         ? urls.slice(0, 10)
-        : ["circle", "star", "heart", "bolt", "moon", "sun", "diamond", "cloud", "key", "gift"];
+        : DEMO_FALLBACK_SHAPES;
       const half = Math.ceil(sample.length / 2);
       demoLeftCircle._shapeLayoutLocked = false;
       demoRightCircle._shapeLayoutLocked = false;
@@ -1137,7 +1173,7 @@
       });
       renderSponsorGrid();
       updateChosenSponsorBar();
-      if (setupPhase === "customize") void refreshSetupLiveDemo();
+      if (setupPhase === "customize") refreshDashboardPreview();
     }
 
     function selectSponsor(sponsorId) {
@@ -1146,7 +1182,7 @@
       selectedSponsorId = sponsorId;
       renderSponsorGrid();
       updateChosenSponsorBar();
-      if (setupPhase === "customize") void refreshSetupLiveDemo();
+      if (setupPhase === "customize") refreshDashboardPreview();
       document.querySelectorAll("[data-event-sponsor]").forEach((el) => {
         el.textContent = `Shapes by ${sponsor.name}`;
         el.hidden = false;
@@ -1501,6 +1537,7 @@
         customBackgroundPosY: bgPosYInput?.value,
         customBackgroundScale: bgScaleInput?.value
       }, { persist: true });
+      refreshDashboardPreview();
     }
 
     bgPosXInput?.addEventListener("input", onBgAdjustInput);
@@ -1537,6 +1574,7 @@
         }
         updateClearBackgroundButton();
         updateSetupPreview();
+        refreshDashboardPreview();
         setupLiveDemo?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } catch (err) {
         if (customBackgroundStatus) customBackgroundStatus.textContent = err.message || "Could not upload.";
@@ -1649,6 +1687,7 @@
         circlesPanelTransparent,
         rankingPanelTransparent
       });
+      refreshDashboardPreview();
     }
 
     circlesPanelTransparentInput?.addEventListener("change", () => {
@@ -2444,10 +2483,7 @@
 
     window.addEventListener("resize", () => {
       if (!setupView.classList.contains("hidden")) {
-        fitSetupPreviewScale();
-        if (isSetupCustomizeView() && selectedThemeBackground === "custom" && customBackgroundUrl) {
-          applyPreviewBackgroundLayer();
-        }
+        refreshDashboardPreview();
       }
       if (gameView.classList.contains("hidden")) return;
       if (!lastGameCircleShapes.left.length && !lastGameCircleShapes.right.length) return;

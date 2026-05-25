@@ -2015,6 +2015,23 @@ input::placeholder {
   display: none;
 }
 
+.setup-game-preview-panel .custom-bg-adjust-controls.is-inactive {
+  opacity: 0.72;
+}
+
+.setup-game-preview-panel .custom-bg-adjust-controls.is-inactive input[type="range"],
+.setup-game-preview-panel .custom-bg-adjust-controls.is-inactive button {
+  cursor: not-allowed;
+}
+
+.setup-game-preview-panel .setup-preview-viewport {
+  min-height: 220px;
+}
+
+.setup-live-demo.setup-game-preview-panel {
+  min-height: 280px;
+}
+
 .custom-bg-adjust-hint {
   margin: 0 0 0.85rem;
   font-size: 0.85rem;
