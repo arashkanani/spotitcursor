@@ -356,7 +356,7 @@
     const setupMessage = document.getElementById("setupMessage");
     const editEventBtn = document.getElementById("editEventBtn");
     const backToMenuBtn = document.getElementById("backToMenuBtn");
-    let hostPinnedView = null;
+    let hostPinnedView = "setup";
     const playerJoinUrl = document.getElementById("playerJoinUrl");
     const qrImage = document.getElementById("qrImage");
     const lobbyPlayerList = document.getElementById("lobbyPlayerList");
@@ -718,7 +718,7 @@
       fitSetupPreviewScale();
 
       if (selectedPatternBadge && selectedThemePattern) {
-        const p = themeCatalog.patterns.find((x) => x.id === selectedThemePattern);
+        const p = getThemePatterns().find((x) => x.id === selectedThemePattern);
         selectedPatternBadge.textContent = p ? p.name : selectedThemePattern;
       }
 
@@ -844,6 +844,22 @@
       }
     }
 
+    function needsEventSetup(branding) {
+      return !String(branding?.title || "").trim() || !branding?.sponsorId;
+    }
+
+    function canOpenLobby(branding) {
+      return Boolean(
+        branding?.themePattern
+        && branding?.sponsorId
+        && String(branding?.title || "").trim()
+      );
+    }
+
+    function getThemePatterns() {
+      return Array.isArray(themeCatalog?.patterns) ? themeCatalog.patterns : [];
+    }
+
     function showSetupPhase(phase) {
       setupPhase = phase;
       if (phase === "patterns") {
@@ -856,8 +872,10 @@
         eventCustomizePanel?.classList.remove("hidden");
         sponsorEditPanel?.classList.add("hidden");
         sponsorLibraryPanel?.classList.remove("hidden");
-        void refreshSetupLiveDemo();
-        fitSetupPreviewScale();
+        requestAnimationFrame(() => {
+          void refreshSetupLiveDemo();
+          fitSetupPreviewScale();
+        });
       } else if (phase === "sponsor-edit") {
         patternPickerPanel?.classList.add("hidden");
         eventCustomizePanel?.classList.add("hidden");
@@ -867,20 +885,40 @@
     }
 
     function enterPattern(patternId) {
-      const pattern = themeCatalog.patterns.find((p) => p.id === patternId);
-      if (!pattern) return;
-      const defaultBg = PATTERN_DEFAULT_BG[patternId] || "midnight";
-      applyGameTheme(patternId, defaultBg, null);
+      const patterns = getThemePatterns();
+      const pattern = patterns.find((p) => p.id === patternId);
+      if (!pattern) {
+        setupMessage.textContent = "Layout options are still loading — wait a moment and try again.";
+        return;
+      }
+
+      try {
+        const defaultBg = PATTERN_DEFAULT_BG[patternId] || "midnight";
+        applyGameTheme(patternId, defaultBg, null);
+      } catch (err) {
+        console.error("enterPattern applyGameTheme failed", err);
+      }
+
       showSetupPhase("customize");
+      syncThemePickerUi();
       setupMessage.textContent = `Customizing “${pattern.name}” — set title, background, and sponsor shapes below.`;
+      eventCustomizePanel?.scrollIntoView({ behavior: "smooth", block: "start" });
       eventTitleInput?.focus();
+      void persistThemeSelection();
     }
 
     function buildPatternLaunchGrid() {
-      if (!patternLaunchGrid || !themeCatalog.patterns.length) return;
+      const patterns = getThemePatterns();
+      if (!patternLaunchGrid) return;
+      if (!patterns.length) {
+        if (patternPickerHint) {
+          patternPickerHint.textContent = "Could not load layouts. Refresh the page or check that the server is running.";
+        }
+        return;
+      }
 
       patternLaunchGrid.innerHTML = "";
-      for (const pattern of themeCatalog.patterns) {
+      for (const pattern of patterns) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = `pattern-launch-card pattern-launch-${pattern.id}`;
@@ -896,7 +934,6 @@
           <span class="pattern-launch-desc">${escapeHtml(pattern.description)}</span>
           <span class="pattern-launch-cta">Customize this layout →</span>
         `;
-        btn.addEventListener("click", () => enterPattern(pattern.id));
         patternLaunchGrid.appendChild(btn);
       }
 
@@ -908,11 +945,18 @@
       syncThemePickerUi();
     }
 
+    patternLaunchGrid?.addEventListener("click", (event) => {
+      const card = event.target.closest(".pattern-launch-card");
+      if (!card?.dataset.pattern) return;
+      enterPattern(card.dataset.pattern);
+    });
+
     function buildBackgroundPicker() {
-      if (!backgroundPicker || !themeCatalog.backgrounds.length) return;
+      const backgrounds = Array.isArray(themeCatalog?.backgrounds) ? themeCatalog.backgrounds : [];
+      if (!backgroundPicker || !backgrounds.length) return;
 
       backgroundPicker.innerHTML = "";
-      for (const bg of themeCatalog.backgrounds) {
+      for (const bg of backgrounds) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = `theme-bg-card theme-bg-${bg.id}`;
@@ -1017,11 +1061,6 @@
         branding?.updatedAt || null
       );
       applyPanelStyle(branding);
-      if (branding?.themePattern) {
-        showSetupPhase("customize");
-      } else {
-        showSetupPhase("patterns");
-      }
       const sponsorLabel = branding?.sponsorName
         ? `Shapes by ${branding.sponsorName}`
         : "";
@@ -1725,25 +1764,40 @@
     });
 
     Promise.all([
-      fetch("/api/themes").then((res) => res.json()),
-      fetch("/api/event-branding").then((res) => res.json())
+      fetch("/api/themes").then((res) => {
+        if (!res.ok) throw new Error("themes");
+        return res.json();
+      }),
+      fetch("/api/event-branding").then((res) => {
+        if (!res.ok) throw new Error("branding");
+        return res.json();
+      })
     ])
       .then(([themesData, branding]) => {
-        themeCatalog = themesData;
+        themeCatalog = {
+          patterns: Array.isArray(themesData?.patterns) ? themesData.patterns : [],
+          backgrounds: Array.isArray(themesData?.backgrounds) ? themesData.backgrounds : [],
+          presets: Array.isArray(themesData?.presets) ? themesData.presets : []
+        };
         buildPatternLaunchGrid();
-        if (branding.title && branding.sponsorId && branding.themePattern) {
-          applyEventBranding(branding);
+        showSetupView();
+        applyEventBranding(branding);
+        if (canOpenLobby(branding)) {
           showLobbyView();
+        } else if (needsEventSetup(branding) || !branding?.themePattern) {
+          showSetupPhase("patterns");
         } else {
-          applyEventBranding(branding);
-          updateSetupPreview();
-          showSetupView();
-          if (!branding.themePattern) showSetupPhase("patterns");
+          showSetupPhase("customize");
         }
       })
       .catch(() => {
+        themeCatalog = { patterns: [], backgrounds: [], presets: [] };
+        buildPatternLaunchGrid();
         showSetupView();
         showSetupPhase("patterns");
+        if (patternPickerHint) {
+          patternPickerHint.textContent = "Could not reach the server. Start it with npm start, then refresh.";
+        }
       });
 
     fetch("/api/join-info")
