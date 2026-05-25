@@ -411,6 +411,7 @@
     let customBackgroundPosX = 50;
     let customBackgroundPosY = 50;
     let customBackgroundScale = 100;
+    let previewBgCacheVersion = null;
     let bgAdjustPersistTimer = null;
     let circlesPanelTransparent = false;
     let rankingPanelTransparent = false;
@@ -502,6 +503,38 @@
       setupPreviewViewport.style.height = `${Math.ceil(SETUP_PREVIEW_REF_HEIGHT * fit)}px`;
     }
 
+    function applyPreviewBackgroundLayer(cacheVersion) {
+      const mesh = setupPreviewScene?.querySelector(".setup-preview-bg");
+      if (!setupPreviewScene || !mesh) return;
+
+      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      setupPreviewScene.dataset.pattern = selectedThemePattern || "classic";
+      setupPreviewScene.dataset.bg = isCustom ? "custom" : (selectedThemeBackground || "midnight");
+
+      if (!isCustom) {
+        setupPreviewScene.style.removeProperty("--custom-bg-url");
+        setupPreviewScene.style.removeProperty("--custom-bg-pos-x");
+        setupPreviewScene.style.removeProperty("--custom-bg-pos-y");
+        setupPreviewScene.style.removeProperty("--custom-bg-size");
+        mesh.style.removeProperty("background");
+        mesh.style.removeProperty("background-image");
+        return;
+      }
+
+      const bustUrl = customBgDisplayUrl(customBackgroundUrl, cacheVersion ?? previewBgCacheVersion);
+      const urlValue = `url("${bustUrl}")`;
+      setupPreviewScene.style.setProperty("--custom-bg-url", urlValue);
+      setupPreviewScene.style.setProperty("--custom-bg-pos-x", `${customBackgroundPosX}%`);
+      setupPreviewScene.style.setProperty("--custom-bg-pos-y", `${customBackgroundPosY}%`);
+      setupPreviewScene.style.setProperty("--custom-bg-size", `${customBackgroundScale}% auto`);
+
+      mesh.style.background = [
+        "linear-gradient(165deg, rgba(6, 9, 18, 0.72) 0%, rgba(6, 9, 18, 0.55) 100%)",
+        `${urlValue} ${customBackgroundPosX}% ${customBackgroundPosY}% / ${customBackgroundScale}% auto no-repeat`,
+        "#060912"
+      ].join(", ");
+    }
+
     function applyCustomBackgroundTransform() {
       const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
       const pageChrome = !isSetupCustomizeView() || !isCustom;
@@ -512,6 +545,12 @@
           el.style.setProperty("--custom-bg-pos-x", `${customBackgroundPosX}%`);
           el.style.setProperty("--custom-bg-pos-y", `${customBackgroundPosY}%`);
           el.style.setProperty("--custom-bg-size", `${customBackgroundScale}% auto`);
+          if (el === setupPreviewScene) {
+            el.style.setProperty(
+              "--custom-bg-url",
+              `url("${customBgDisplayUrl(customBackgroundUrl, previewBgCacheVersion)}")`
+            );
+          }
         } else {
           el.style.removeProperty("--custom-bg-pos-x");
           el.style.removeProperty("--custom-bg-pos-y");
@@ -525,6 +564,10 @@
         document.body.style.removeProperty("--custom-bg-pos-x");
         document.body.style.removeProperty("--custom-bg-pos-y");
         document.body.style.removeProperty("--custom-bg-size");
+      }
+
+      if (isCustom) {
+        applyPreviewBackgroundLayer();
       }
 
       updateCustomBackgroundAdjustPanel();
@@ -593,10 +636,14 @@
         document.body.style.removeProperty("--custom-bg-url");
       }
 
+      if (cacheVersion) {
+        previewBgCacheVersion = cacheVersion;
+      }
+
       if (isCustom) {
         const bustUrl = customBgDisplayUrl(
           customBackgroundUrl,
-          cacheVersion || null
+          cacheVersion || previewBgCacheVersion
         );
         const urlValue = `url("${bustUrl}")`;
         const previewTargets = setupPreviewScene ? [setupPreviewScene] : [];
@@ -612,19 +659,11 @@
         layer.style.removeProperty("background");
         layer.style.removeProperty("background-image");
       });
-      const setupPreviewMesh = setupPreviewScene?.querySelector(".setup-preview-bg");
-      if (setupPreviewMesh) {
-        setupPreviewMesh.style.removeProperty("background");
-        setupPreviewMesh.style.removeProperty("background-image");
-      }
 
-      if (setupPreviewScene) {
-        setupPreviewScene.dataset.pattern = selectedThemePattern || "classic";
-        setupPreviewScene.dataset.bg = selectedThemeBackground;
-      }
       if (setupLiveDemo) {
         setupLiveDemo.dataset.pattern = selectedThemePattern || "classic";
       }
+      applyPreviewBackgroundLayer(cacheVersion || previewBgCacheVersion);
       fitSetupPreviewScale();
 
       if (selectedPatternBadge && selectedThemePattern) {
@@ -1307,7 +1346,7 @@
         customBackgroundPosX: bgPosXInput?.value,
         customBackgroundPosY: bgPosYInput?.value,
         customBackgroundScale: bgScaleInput?.value
-      }, { persist: true, refreshPreview: true });
+      }, { persist: true });
     }
 
     bgPosXInput?.addEventListener("input", onBgAdjustInput);
@@ -1319,7 +1358,7 @@
         customBackgroundPosX: 50,
         customBackgroundPosY: 50,
         customBackgroundScale: 100
-      }, { persist: true, refreshPreview: true });
+      }, { persist: true });
     });
 
     customBackgroundInput?.addEventListener("change", async () => {
