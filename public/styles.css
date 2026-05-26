@@ -1960,11 +1960,28 @@ input::placeholder {
   transform-origin: top left;
 }
 
-.setup-game-preview-panel .setup-preview-bg.bg-mesh {
+.setup-game-preview-panel .setup-preview-bg {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
+}
+
+.setup-game-preview-panel .setup-preview-bg-img {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 0;
+  max-width: none;
+  height: auto;
+  min-height: 100%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  object-fit: none;
+}
+
+.setup-game-preview-panel .setup-preview-bg-img[hidden] {
+  display: none !important;
 }
 
 .setup-game-preview-panel .setup-preview-vignette {
@@ -2165,8 +2182,7 @@ body[data-bg="custom"] {
   background: linear-gradient(165deg, #1a2744 0%, #101828 45%, #0a1020 100%);
 }
 
-body[data-bg="custom"] .bg-mesh,
-[data-bg="custom"] .bg-mesh {
+body[data-bg="custom"] > .bg-mesh {
   background: none;
   background-color: transparent;
 }
@@ -2197,8 +2213,21 @@ body[data-bg="custom"] .bg-sparkle {
   background: #121c30;
 }
 
-.setup-game-preview-panel .setup-preview-bg.bg-mesh {
+.setup-game-preview-panel[data-bg="custom"] .setup-preview-bg,
+.setup-game-preview-panel[data-bg="custom"] .setup-preview-bg-img {
+  z-index: 0;
+}
+
+.setup-game-preview-panel[data-bg="custom"] .setup-preview-inner {
   z-index: 1;
+}
+
+#setupPreviewScene[data-bg="custom"] .setup-preview-bg {
+  background-color: transparent;
+  background-image: var(--custom-bg-url, none);
+  background-position: var(--custom-bg-pos-x, 50%) var(--custom-bg-pos-y, 50%);
+  background-size: var(--custom-bg-size, 100% auto);
+  background-repeat: no-repeat;
 }
 
 .theme-bg-swatch-custom {
@@ -2348,7 +2377,8 @@ body[data-bg="custom"] .bg-sparkle {
 
 /* Background themes */
 body[data-bg="midnight"] .bg-mesh,
-[data-bg="midnight"] .bg-mesh {
+[data-bg="midnight"] .bg-mesh,
+#setupPreviewScene[data-bg="midnight"] .setup-preview-bg {
   background:
     radial-gradient(ellipse 80% 50% at 20% -10%, rgba(92, 225, 230, 0.18), transparent 55%),
     radial-gradient(ellipse 70% 45% at 90% 10%, rgba(139, 124, 248, 0.2), transparent 50%),
@@ -2357,7 +2387,8 @@ body[data-bg="midnight"] .bg-mesh,
 }
 
 body[data-bg="ocean"] .bg-mesh,
-[data-bg="ocean"] .bg-mesh {
+[data-bg="ocean"] .bg-mesh,
+#setupPreviewScene[data-bg="ocean"] .setup-preview-bg {
   background:
     radial-gradient(ellipse 75% 55% at 15% 0%, rgba(56, 189, 248, 0.28), transparent 55%),
     radial-gradient(ellipse 65% 45% at 95% 20%, rgba(14, 165, 233, 0.22), transparent 50%),
@@ -2367,7 +2398,8 @@ body[data-bg="ocean"] .bg-mesh,
 body[data-bg="ocean"] { --accent-cyan: #38bdf8; --accent-violet: #60a5fa; }
 
 body[data-bg="sunset"] .bg-mesh,
-[data-bg="sunset"] .bg-mesh {
+[data-bg="sunset"] .bg-mesh,
+#setupPreviewScene[data-bg="sunset"] .setup-preview-bg {
   background:
     radial-gradient(ellipse 70% 50% at 80% 0%, rgba(251, 146, 60, 0.35), transparent 55%),
     radial-gradient(ellipse 60% 45% at 10% 30%, rgba(244, 114, 182, 0.2), transparent 50%),
@@ -2377,7 +2409,8 @@ body[data-bg="sunset"] .bg-mesh,
 body[data-bg="sunset"] { --accent-cyan: #fb923c; --accent-gold: #fcd34d; --accent-rose: #fb7185; }
 
 body[data-bg="emerald"] .bg-mesh,
-[data-bg="emerald"] .bg-mesh {
+[data-bg="emerald"] .bg-mesh,
+#setupPreviewScene[data-bg="emerald"] .setup-preview-bg {
   background:
     radial-gradient(ellipse 70% 50% at 20% 10%, rgba(52, 211, 153, 0.28), transparent 55%),
     radial-gradient(ellipse 60% 45% at 90% 80%, rgba(16, 185, 129, 0.2), transparent 50%),
@@ -2387,7 +2420,8 @@ body[data-bg="emerald"] .bg-mesh,
 body[data-bg="emerald"] { --accent-cyan: #34d399; --accent-violet: #6ee7b7; }
 
 body[data-bg="royal"] .bg-mesh,
-[data-bg="royal"] .bg-mesh {
+[data-bg="royal"] .bg-mesh,
+#setupPreviewScene[data-bg="royal"] .setup-preview-bg {
   background:
     radial-gradient(ellipse 75% 55% at 70% 0%, rgba(167, 139, 250, 0.32), transparent 55%),
     radial-gradient(ellipse 60% 45% at 5% 60%, rgba(192, 132, 252, 0.18), transparent 50%),
