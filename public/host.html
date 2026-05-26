@@ -414,6 +414,61 @@
         photo: player.photo || playerPhotos.get(player.id) || ""
       }));
     }
+
+    function sortLeaderboard(board) {
+      return [...board].sort(
+        (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0)
+          || String(a.name || "").localeCompare(String(b.name || ""))
+      );
+    }
+
+    function mergePlayerIntoLeaderboard(player) {
+      if (!player?.id) return;
+      const entry = {
+        id: player.id,
+        name: player.name || "Player",
+        score: Number(player.score) || 0,
+        countryCode: player.countryCode || "",
+        countryName: player.countryName || "",
+        photo: player.photo || playerPhotos.get(player.id) || ""
+      };
+      const idx = latestLeaderboard.findIndex((p) => p.id === player.id);
+      if (idx >= 0) {
+        latestLeaderboard[idx] = { ...latestLeaderboard[idx], ...entry };
+      } else {
+        latestLeaderboard.push(entry);
+      }
+      latestLeaderboard = sortLeaderboard(latestLeaderboard);
+    }
+
+    function setLeaderboardFromServer(leaderboard) {
+      latestLeaderboard = sortLeaderboard(
+        (leaderboard || []).map((player) => ({
+          id: player.id,
+          name: player.name || "Player",
+          score: Number(player.score) || 0,
+          countryCode: player.countryCode || "",
+          countryName: player.countryName || "",
+          photo: player.photo || playerPhotos.get(player.id) || ""
+        }))
+      );
+    }
+
+    function removePlayerFromLeaderboard(playerId) {
+      if (!playerId) return;
+      latestLeaderboard = latestLeaderboard.filter((p) => p.id !== playerId);
+    }
+
+    function refreshPlayersUi() {
+      if (hostPinnedView === "setup") return;
+      if (!gameView.classList.contains("hidden")) {
+        renderRanking(latestLeaderboard);
+        return;
+      }
+      if (!lobbyView.classList.contains("hidden")) {
+        renderLobbyPlayers(latestLeaderboard);
+      }
+    }
     let currentEventTitle = "";
     let selectedSponsorId = null;
     let sponsorCatalog = [];
@@ -504,15 +559,29 @@
       document.body.classList.toggle("host-editing-custom-bg", hasCustom && onDashboard);
     }
 
-    function refreshDashboardPreview() {
+    function repositionDemoCircleShapes() {
+      for (const circleEl of [demoLeftCircle, demoRightCircle]) {
+        if (!circleEl?._shapeLayoutLocked) continue;
+        const size = getCircleRenderSize(circleEl);
+        if (size >= 16) applyShapePositions(circleEl, size);
+      }
+    }
+
+    function refreshDashboardBackground() {
       if (setupPhase !== "customize") return;
       try {
         applyPreviewBackgroundLayer();
         paintAllCustomBackgroundMeshes();
         fitSetupPreviewScale();
+        repositionDemoCircleShapes();
       } catch (err) {
-        console.error("refreshDashboardPreview failed", err);
+        console.error("refreshDashboardBackground failed", err);
       }
+    }
+
+    function refreshDashboardPreview() {
+      if (setupPhase !== "customize") return;
+      refreshDashboardBackground();
       void refreshSetupLiveDemo();
     }
 
@@ -614,14 +683,8 @@
       paintCustomBgMesh(mesh, bustUrl);
 
       if (setupPreviewBgImg) {
-        setupPreviewBgImg.hidden = false;
-        setupPreviewBgImg.style.objectPosition = `${customBackgroundPosX}% ${customBackgroundPosY}%`;
-        setupPreviewBgImg.style.width = `${customBackgroundScale}%`;
-        setupPreviewBgImg.style.height = "auto";
-        if (setupPreviewBgImg.dataset.loadedSrc !== bustUrl) {
-          setupPreviewBgImg.dataset.loadedSrc = bustUrl;
-          setupPreviewBgImg.src = bustUrl;
-        }
+        setupPreviewBgImg.hidden = true;
+        setupPreviewBgImg.removeAttribute("src");
       }
     }
 
@@ -1153,6 +1216,9 @@
     async function refreshSetupLiveDemo() {
       if (!demoLeftCircle || !demoRightCircle) return;
 
+      bumpShapeRenderGeneration(demoLeftCircle);
+      bumpShapeRenderGeneration(demoRightCircle);
+
       let urls = [];
       const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
       if (sponsor) {
@@ -1592,11 +1658,7 @@
         customBackgroundPosY: bgPosYInput?.value,
         customBackgroundScale: bgScaleInput?.value
       }, { persist: true });
-      applyPreviewBackgroundLayer();
-      if (setupPreviewBgImg && !setupPreviewBgImg.hidden) {
-        setupPreviewBgImg.style.objectPosition = `${customBackgroundPosX}% ${customBackgroundPosY}%`;
-        setupPreviewBgImg.style.width = `${customBackgroundScale}%`;
-      }
+      refreshDashboardBackground();
     }
 
     bgPosXInput?.addEventListener("input", onBgAdjustInput);
@@ -1775,6 +1837,7 @@
       setupView.classList.add("hidden");
       lobbyView.classList.remove("hidden");
       gameView.classList.add("hidden");
+      renderLobbyPlayers(latestLeaderboard);
       let lobbyBg = selectedThemeBackground;
       if (lobbyBg === "custom" && !customBackgroundUrl) {
         lobbyBg = PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight";
@@ -1976,18 +2039,29 @@
 
     socket.on("playerJoined", (player) => {
       cachePlayerPhoto(player);
+      mergePlayerIntoLeaderboard(player);
+      refreshPlayersUi();
     });
 
     socket.on("playerLeft", (data) => {
-      if (data?.id) playerPhotos.delete(data.id);
+      if (!data?.id) return;
+      playerPhotos.delete(data.id);
+      removePlayerFromLeaderboard(data.id);
+      refreshPlayersUi();
     });
 
     socket.on("lobbySnapshot", (data) => {
-      (data.players || []).forEach(cachePlayerPhoto);
+      for (const player of data.players || []) {
+        cachePlayerPhoto(player);
+        mergePlayerIntoLeaderboard(player);
+      }
+      refreshPlayersUi();
     });
 
     socket.on("lobbyCleared", () => {
       playerPhotos.clear();
+      latestLeaderboard = [];
+      refreshPlayersUi();
     });
 
     function renderLobbyPlayers(leaderboard) {
@@ -2184,6 +2258,14 @@
       if (!container || !cache?.items?.length) return;
 
       const nodes = container.querySelectorAll(".shape");
+      if (nodes.length > cache.items.length) {
+        container.replaceChildren();
+        circleEl._shapeLayoutLocked = false;
+        if (circleEl._pendingShapes?.length) {
+          scheduleRenderShapes(circleEl, circleEl._pendingShapes);
+        }
+        return;
+      }
       cache.items.forEach((entry, index) => {
         const item = nodes[index];
         if (!item) return;
@@ -2207,17 +2289,33 @@
       circleRenderObservers.set(circleEl, observer);
     }
 
-    function scheduleRenderShapes(circleEl, shapes, attempt = 0) {
+    function bumpShapeRenderGeneration(circleEl) {
+      if (!circleEl) return 0;
+      circleEl._shapeRenderGen = (circleEl._shapeRenderGen || 0) + 1;
+      return circleEl._shapeRenderGen;
+    }
+
+    function isShapeRenderCurrent(circleEl, generation) {
+      return circleEl && circleEl._shapeRenderGen === generation;
+    }
+
+    function scheduleRenderShapes(circleEl, shapes, attempt = 0, generation) {
       if (!circleEl) return;
       const list = shapes || [];
+      const gen = generation ?? bumpShapeRenderGeneration(circleEl);
       circleEl._pendingShapes = list;
+
       const size = getCircleRenderSize(circleEl);
       if (size >= 16 && list.length) {
+        if (!isShapeRenderCurrent(circleEl, gen)) return;
         renderShapes(circleEl, list, size);
         return;
       }
       if (attempt < 80) {
-        requestAnimationFrame(() => scheduleRenderShapes(circleEl, shapes, attempt + 1));
+        requestAnimationFrame(() => {
+          if (!isShapeRenderCurrent(circleEl, gen)) return;
+          scheduleRenderShapes(circleEl, list, attempt + 1, gen);
+        });
       }
     }
 
@@ -2286,7 +2384,7 @@
       if (!container) return;
       const list = shapes || [];
       if (!list.length) {
-        container.innerHTML = "";
+        container.replaceChildren();
         circleEl._shapeDisplayCache = null;
         circleEl._shapeLayoutLocked = false;
         return;
@@ -2302,7 +2400,7 @@
       }
 
       const displayItems = getOrCreateShapeDisplayCache(circleEl, list, size, layoutLockKey);
-      container.innerHTML = "";
+      container.replaceChildren();
 
       displayItems.forEach((entry) => {
         const item = document.createElement("div");
@@ -2347,14 +2445,15 @@
     });
 
     socket.on("gameState", (state) => {
-      latestLeaderboard = state.leaderboard || [];
+      setLeaderboardFromServer(state.leaderboard);
+      (state.leaderboard || []).forEach(cachePlayerPhoto);
       if (hostPinnedView === "setup") return;
 
       if (state.eventBranding) applyEventBranding(state.eventBranding);
 
       if (state.started && !state.ended) {
         showGameView();
-        renderRanking(state.leaderboard);
+        renderRanking(latestLeaderboard);
         setGameStatusHud(state.roundNumber, state.totalRounds, state.playerCount);
 
         if (state.roundNumber !== roundCelebrationRound) {
@@ -2376,7 +2475,7 @@
 
       lastRenderedRoundShapesKey = "";
       showLobbyView();
-      renderLobbyPlayers(state.leaderboard);
+      renderLobbyPlayers(latestLeaderboard);
 
       if (state.ended) {
         lobbyStatus.textContent = "Game finished. Players can stay connected — press Start for a new game.";
@@ -2531,21 +2630,22 @@
 
     socket.on("gameOver", (data) => {
       if (hostPinnedView === "setup") return;
+      setLeaderboardFromServer(data.leaderboard);
+      (data.leaderboard || []).forEach(cachePlayerPhoto);
       showLobbyView();
-      if (!data.leaderboard.length) {
+      if (!latestLeaderboard.length) {
         lobbyStatus.textContent = "Game over. No players joined.";
         startBtn.disabled = true;
         return;
       }
-      lobbyStatus.textContent = `Game over. Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score}). Press Start for a rematch.`;
-      renderLobbyPlayers(data.leaderboard);
-      (data.leaderboard || []).forEach(cachePlayerPhoto);
+      lobbyStatus.textContent = `Game over. Winner: ${latestLeaderboard[0].name} (${latestLeaderboard[0].score}). Press Start for a rematch.`;
+      renderLobbyPlayers(latestLeaderboard);
       startBtn.disabled = false;
     });
 
     window.addEventListener("resize", () => {
       if (!setupView.classList.contains("hidden")) {
-        refreshDashboardPreview();
+        refreshDashboardBackground();
       }
       if (gameView.classList.contains("hidden")) return;
       if (!lastGameCircleShapes.left.length && !lastGameCircleShapes.right.length) return;
@@ -2559,10 +2659,14 @@
     attachCircleRenderObserver(demoRightCircle);
 
     if (setupLiveDemo && typeof ResizeObserver !== "undefined") {
+      let previewResizeTimer = null;
       const previewResizeObserver = new ResizeObserver(() => {
-        if (setupPhase === "customize" && !setupView.classList.contains("hidden")) {
-          scheduleDashboardPreview();
-        }
+        if (setupPhase !== "customize" || setupView.classList.contains("hidden")) return;
+        if (previewResizeTimer) clearTimeout(previewResizeTimer);
+        previewResizeTimer = setTimeout(() => {
+          previewResizeTimer = null;
+          refreshDashboardBackground();
+        }, 80);
       });
       previewResizeObserver.observe(setupLiveDemo);
     }
