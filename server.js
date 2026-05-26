@@ -3,6 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const crypto = require("crypto");
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const compression = require("compression");
 const multer = require("multer");
 const { createServer } = require("http");
@@ -12,6 +13,8 @@ const sponsors = require("./lib/sponsors");
 const eventBrandingStore = require("./lib/event-branding");
 const themes = require("./lib/themes");
 const { PORT, IS_PRODUCTION, PUBLIC_URL, MAX_PLAYERS, ROUND_TIMEOUT_MS } = require("./lib/config");
+const userStore = require("./lib/user-store");
+const authLib = require("./lib/auth");
 
 const app = express();
 const httpServer = createServer(app);
@@ -276,6 +279,94 @@ function getEventPayload() {
   };
 }
 
+function appendAudit({ userId, email, req, type, meta }) {
+  const uid = userId ?? req?.user?.id ?? null;
+  const mail = email ? userStore.normalizeEmail(email) : req?.user?.email ?? null;
+  userStore.appendActivity({
+    userId: uid || null,
+    email: mail,
+    type: String(type || "unknown"),
+    meta: meta && typeof meta === "object" ? meta : {}
+  });
+}
+
+/** Apply full PUT /api/event-branding semantics; optional req for auditing. Returns { error } or { payload }. */
+function commitFullEventBrandingFromBody(body, req) {
+  const title = String(body?.title || "").trim().slice(0, 80);
+  const sponsorId = String(body?.sponsorId || "").trim();
+  const incomingUrls = Array.isArray(body?.customBackgroundUrls)
+    ? body.customBackgroundUrls
+    : null;
+  const incomingCustomUrl = body?.customBackgroundUrl || null;
+  const theme = themes.normalizeTheme({
+    themePattern: body?.themePattern,
+    themeBackground: body?.themeBackground,
+    customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl,
+    customBackgroundUrls: incomingUrls || eventConfig.customBackgroundUrls
+  });
+  const incomingBackgrounds = Array.isArray(body?.customBackgrounds)
+    ? body.customBackgrounds
+    : null;
+  const customBackgrounds = eventBrandingStore.normalizeCustomBackgrounds({
+    ...eventConfig,
+    customBackgrounds: incomingBackgrounds || eventConfig.customBackgrounds,
+    customBackgroundUrls: incomingUrls || eventConfig.customBackgroundUrls,
+    customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl
+  });
+  const customBackgroundUrls = customBackgrounds.map((entry) => entry.url);
+  const customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(customBackgrounds);
+
+  if (!title) {
+    return { error: "Event title is required." };
+  }
+  if (!sponsorId) {
+    return { error: "Please choose a sponsor shape pack." };
+  }
+  if (!themes.isValidPattern(body?.themePattern)) {
+    return { error: "Please choose a game screen layout." };
+  }
+
+  const sponsor = sponsors.getSponsorById(sponsorId);
+  if (!sponsor) {
+    return { error: "Sponsor not found." };
+  }
+  if (sponsor.shapeCount < sponsors.MIN_SHAPES_PER_SPONSOR) {
+    return {
+      error: `This sponsor needs at least ${sponsors.MIN_SHAPES_PER_SPONSOR} PNG shapes (has ${sponsor.shapeCount}).`
+    };
+  }
+
+  if (game.started && !game.ended) {
+    cancelGame();
+  }
+
+  sponsors.setActiveSponsorId(sponsorId);
+  eventConfig = eventBrandingStore.writeEventConfig({
+    title,
+    sponsorId: sponsor.id,
+    sponsorName: sponsor.name,
+    themePattern: theme.themePattern,
+    themeBackground: theme.themeBackground,
+    customBackgroundUrl,
+    customBackgroundUrls,
+    customBackgrounds,
+    ...eventBrandingStore.primaryBackgroundTransform(customBackgrounds),
+    circlesPanelTransparent: !!body?.circlesPanelTransparent,
+    rankingPanelTransparent: !!body?.rankingPanelTransparent
+  });
+  const payload = getEventPayload();
+  io.emit("eventBranding", payload);
+  emitGameState();
+
+  appendAudit({
+    req,
+    type: "event.put_branding",
+    meta: { title: title.slice(0, 60), sponsorId: sponsor.id }
+  });
+
+  return { payload };
+}
+
 function getPublicBaseUrl(req) {
   if (PUBLIC_URL) return PUBLIC_URL;
   if (req) {
@@ -431,6 +522,8 @@ function resetSession() {
 
 app.use(compression());
 app.use(express.json({ limit: "12mb" }));
+app.use(cookieParser());
+app.use(authLib.attachUserMiddleware());
 app.use(express.static(path.join(__dirname, "public"), {
   maxAge: IS_PRODUCTION ? "1h" : 0,
   etag: true
@@ -456,7 +549,9 @@ app.get("/health", (_req, res) => {
     maxPlayers: MAX_PLAYERS,
     uptime: Math.floor(process.uptime()),
     features: {
-      multiCustomBackgrounds: true
+      multiCustomBackgrounds: true,
+      accounts: true,
+      dashboards: true
     }
   });
 });
@@ -483,6 +578,116 @@ app.get("/api/themes", (_req, res) => {
 
 app.get("/api/event-branding", (_req, res) => {
   res.json(getEventPayload());
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const emailRaw = req.body?.email;
+    const email = typeof emailRaw === "string" ? emailRaw.trim() : "";
+    const password = String(req.body?.password || "");
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters." });
+      return;
+    }
+    const passwordHash = await authLib.hashPassword(password);
+    const user = userStore.createUser({ email, passwordHash });
+    appendAudit({ userId: user.id, email: user.email, type: "auth.register", meta: {} });
+    const token = authLib.signUserToken(user);
+    res.cookie(authLib.COOKIE_NAME, token, authLib.authCookieOptions());
+    res.status(201).json({ user: userStore.publicUser(user) });
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Could not register." });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const email = userStore.normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    const user = userStore.findUserByEmail(email);
+    const okPass = user && (await authLib.verifyPassword(password, user.passwordHash));
+    if (!okPass) {
+      res.status(401).json({ error: "Incorrect email or password." });
+      return;
+    }
+    appendAudit({ userId: user.id, email: user.email, type: "auth.login", meta: {} });
+    const token = authLib.signUserToken(user);
+    res.cookie(authLib.COOKIE_NAME, token, authLib.authCookieOptions());
+    res.json({ user: userStore.publicUser(user) });
+  } catch (_error) {
+    res.status(400).json({ error: "Could not sign in." });
+  }
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  appendAudit({ req, type: "auth.logout", meta: {} });
+  authLib.clearAuthCookie(res);
+  res.json({ ok: true });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  if (!req.user) {
+    res.json({ user: null });
+    return;
+  }
+  res.json({ user: req.user });
+});
+
+app.get("/api/dashboards", authLib.requireAuth, (req, res) => {
+  res.json({ dashboards: userStore.listDashboards(req.user.id) });
+});
+
+app.post("/api/dashboards", authLib.requireAuth, (req, res) => {
+  try {
+    const name = req.body?.name;
+    const config = req.body?.config;
+    if (!config || typeof config !== "object") {
+      res.status(400).json({ error: "Dashboard config (JSON object) is required." });
+      return;
+    }
+    const entry = userStore.saveDashboard(req.user.id, name, config);
+    appendAudit({ req, type: "dashboard.save", meta: { name: entry.name, id: entry.id } });
+    res.status(201).json({
+      dashboard: { id: entry.id, name: entry.name, updatedAt: entry.updatedAt }
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Could not save dashboard." });
+  }
+});
+
+app.delete("/api/dashboards/:id", authLib.requireAuth, (req, res) => {
+  const ok = userStore.deleteDashboard(req.user.id, req.params.id);
+  if (!ok) {
+    res.status(404).json({ error: "Dashboard not found." });
+    return;
+  }
+  appendAudit({ req, type: "dashboard.delete", meta: { id: req.params.id } });
+  res.json({ ok: true });
+});
+
+app.post("/api/dashboards/:id/apply", authLib.requireAuth, (req, res) => {
+  const dash = userStore.getDashboard(req.user.id, req.params.id);
+  if (!dash) {
+    res.status(404).json({ error: "Dashboard not found." });
+    return;
+  }
+  const result = commitFullEventBrandingFromBody(dash.config, req);
+  if (result.error) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  appendAudit({ req, type: "dashboard.apply", meta: { id: dash.id, name: dash.name } });
+  res.json(result.payload);
+});
+
+app.get("/api/admin/users", authLib.requireAdmin, (_req, res) => {
+  res.json({ users: userStore.listUsersPublic() });
+});
+
+app.get("/api/admin/activity", authLib.requireAdmin, (req, res) => {
+  const limit = Number(req.query.limit) || 100;
+  const offset = Number(req.query.offset) || 0;
+  res.json(userStore.listActivity({ limit, offset }));
 });
 
 function isStoredBackgroundFile(file) {
@@ -588,10 +793,15 @@ app.patch("/api/event-branding/theme", (req, res) => {
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
+  appendAudit({
+    req,
+    type: "event.patch_theme",
+    meta: { backgroundCount: eventConfig.customBackgrounds?.length || 0 }
+  });
   res.json(payload);
 });
 
-function handleClearCustomBackground(_req, res) {
+function handleClearCustomBackground(req, res) {
   clearStoredCustomBackgroundFiles();
   eventConfig.customBackgroundUrl = null;
   eventConfig.customBackgroundUrls = [];
@@ -602,6 +812,7 @@ function handleClearCustomBackground(_req, res) {
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
+  appendAudit({ req, type: "event.background_clear_all", meta: {} });
   res.json(payload);
 }
 
@@ -635,10 +846,9 @@ function handleDeleteCustomBackground(req, res) {
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
+  appendAudit({ req, type: "event.delete_background", meta: { url: target } });
   res.json(payload);
 }
-
-app.post("/api/event-background/clear", handleClearCustomBackground);
 app.delete("/api/event-background", (req, res) => {
   if (req.query?.url || req.body?.url) {
     handleDeleteCustomBackground(req, res);
@@ -657,6 +867,11 @@ app.post("/api/event-background", backgroundUpload.single("background"), (req, r
     eventConfig = appendCustomBackgroundUrl(url);
     const payload = getEventPayload();
     io.emit("eventBranding", payload);
+    appendAudit({
+      req,
+      type: "event.upload_background",
+      meta: { filename: req.file.filename }
+    });
     res.json(payload);
   } catch (error) {
     res.status(400).json({ error: error.message || "Could not save background." });
@@ -664,78 +879,12 @@ app.post("/api/event-background", backgroundUpload.single("background"), (req, r
 });
 
 app.put("/api/event-branding", (req, res) => {
-  const title = String(req.body?.title || "").trim().slice(0, 80);
-  const sponsorId = String(req.body?.sponsorId || "").trim();
-  const incomingUrls = Array.isArray(req.body?.customBackgroundUrls)
-    ? req.body.customBackgroundUrls
-    : null;
-  const incomingCustomUrl = req.body?.customBackgroundUrl || null;
-  const theme = themes.normalizeTheme({
-    themePattern: req.body?.themePattern,
-    themeBackground: req.body?.themeBackground,
-    customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl,
-    customBackgroundUrls: incomingUrls || eventConfig.customBackgroundUrls
-  });
-  const incomingBackgrounds = Array.isArray(req.body?.customBackgrounds)
-    ? req.body.customBackgrounds
-    : null;
-  const customBackgrounds = eventBrandingStore.normalizeCustomBackgrounds({
-    ...eventConfig,
-    customBackgrounds: incomingBackgrounds || eventConfig.customBackgrounds,
-    customBackgroundUrls: incomingUrls || eventConfig.customBackgroundUrls,
-    customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl
-  });
-  const customBackgroundUrls = customBackgrounds.map((entry) => entry.url);
-  const customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(customBackgrounds);
-
-  if (!title) {
-    res.status(400).json({ error: "Event title is required." });
+  const result = commitFullEventBrandingFromBody(req.body, req);
+  if (result.error) {
+    res.status(400).json({ error: result.error });
     return;
   }
-  if (!sponsorId) {
-    res.status(400).json({ error: "Please choose a sponsor shape pack." });
-    return;
-  }
-  if (!themes.isValidPattern(req.body?.themePattern)) {
-    res.status(400).json({ error: "Please choose a game screen layout." });
-    return;
-  }
-
-  const sponsor = sponsors.getSponsorById(sponsorId);
-  if (!sponsor) {
-    res.status(400).json({ error: "Sponsor not found." });
-    return;
-  }
-  if (sponsor.shapeCount < sponsors.MIN_SHAPES_PER_SPONSOR) {
-    res.status(400).json({
-      error: `This sponsor needs at least ${sponsors.MIN_SHAPES_PER_SPONSOR} PNG shapes (has ${sponsor.shapeCount}).`
-    });
-    return;
-  }
-
-  if (game.started && !game.ended) {
-    cancelGame();
-  }
-
-  sponsors.setActiveSponsorId(sponsorId);
-  const bgTransform = eventBrandingStore.parseBgTransform(req.body);
-  eventConfig = eventBrandingStore.writeEventConfig({
-    title,
-    sponsorId: sponsor.id,
-    sponsorName: sponsor.name,
-    themePattern: theme.themePattern,
-    themeBackground: theme.themeBackground,
-    customBackgroundUrl,
-    customBackgroundUrls,
-    customBackgrounds,
-    ...eventBrandingStore.primaryBackgroundTransform(customBackgrounds),
-    circlesPanelTransparent: !!req.body?.circlesPanelTransparent,
-    rankingPanelTransparent: !!req.body?.rankingPanelTransparent
-  });
-  const payload = getEventPayload();
-  io.emit("eventBranding", payload);
-  emitGameState();
-  res.json(payload);
+  res.json(result.payload);
 });
 
 app.get("/api/sponsors", (_req, res) => {
@@ -758,6 +907,7 @@ app.get("/api/sponsors/:id", (req, res) => {
 app.post("/api/sponsors", (req, res) => {
   try {
     const sponsor = sponsors.createSponsor(req.body?.name);
+    appendAudit({ req, type: "sponsor.create", meta: { sponsorId: sponsor.id, name: sponsor.name } });
     res.status(201).json(sponsor);
   } catch (error) {
     res.status(400).json({ error: error.message || "Could not create sponsor." });
@@ -778,6 +928,11 @@ app.post(
         return;
       }
       const sponsor = sponsors.addShapeFiles(req.params.id, files);
+      appendAudit({
+        req,
+        type: "sponsor.upload_shapes",
+        meta: { sponsorId: req.params.id, count: files.length }
+      });
       res.json(sponsor);
     } catch (error) {
       res.status(400).json({ error: error.message || "Could not save shapes." });
@@ -788,6 +943,11 @@ app.post(
 app.delete("/api/sponsors/:id/shapes/:filename", (req, res) => {
   try {
     const sponsor = sponsors.deleteShape(req.params.id, req.params.filename);
+    appendAudit({
+      req,
+      type: "sponsor.delete_shape",
+      meta: { sponsorId: req.params.id, filename: req.params.filename }
+    });
     res.json(sponsor);
   } catch (error) {
     res.status(400).json({ error: error.message || "Could not delete shape." });
@@ -921,6 +1081,16 @@ io.on("connection", (socket) => {
     };
     players.set(player.id, player);
     bindSocketToPlayer(socket, player);
+    appendAudit({
+      userId: null,
+      email: null,
+      type: "mobile.player_photo_registered",
+      meta: {
+        name,
+        countryCode,
+        approximatePhotoChars: photo.length
+      }
+    });
     socket.emit("joined", {
       id: player.id,
       token: player.token,

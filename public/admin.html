@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin · Shape Match</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .admin-wrap { font-family: Outfit, system-ui, sans-serif; color: #e8eaf4; padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+    .admin-wrap h1 { font-size: 1.5rem; margin-bottom: 0.35rem; }
+    .admin-wrap .sub { opacity: 0.75; margin-bottom: 1.25rem; }
+    .admin-grid { display: grid; gap: 1rem; }
+    @media (min-width: 900px) { .admin-grid { grid-template-columns: 1fr 1fr; align-items: start; } }
+    .panel {
+      background: rgba(15, 18, 32, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1rem;
+    }
+    .panel h2 { font-size: 1rem; margin-bottom: 0.75rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.4rem 0.35rem; border-bottom: 1px solid rgba(255, 255, 255, 0.06); vertical-align: top; }
+    th { opacity: 0.7; font-weight: 600; }
+    .muted { opacity: 0.65; }
+    code { font-size: 0.78rem; word-break: break-all; background: rgba(0, 0, 0, 0.35); padding: 0.1rem 0.35rem; border-radius: 4px; }
+    .err { background: rgba(255, 80, 100, 0.15); border: 1px solid rgba(255, 120, 130, 0.35); color: #ffb4c0; padding: 0.75rem; border-radius: 10px; margin-bottom: 1rem; }
+    .toolbar { margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    button.load-more {
+      font-family: inherit;
+      padding: 0.45rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .top-links a { color: #9dd6ff; text-decoration: none; font-weight: 600; margin-right: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="bg-mesh"></div>
+  <div class="bg-vignette"></div>
+  <div class="admin-wrap">
+    <div class="top-links">
+      <a href="/">Host</a>
+      <a href="/account.html">Account</a>
+    </div>
+    <h1>Admin dashboard</h1>
+    <p class="sub">Visible only when your email is listed in <code>ADMIN_EMAILS</code> (comma-separated).</p>
+
+    <div id="adminError" class="err hidden"></div>
+
+    <div class="admin-grid">
+      <div class="panel">
+        <h2>Registered users</h2>
+        <table>
+          <thead><tr><th>Email</th><th>Role</th></tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>Activity log</h2>
+        <p class="muted" style="font-size:0.85rem;">Host actions, background &amp; shape uploads, branding saves, and mobile player signup (photo size only — no image stored in the log).</p>
+        <div class="toolbar">
+          <button type="button" class="load-more" id="reloadBtn">Refresh</button>
+          <button type="button" class="load-more" id="moreBtn">Load more</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="activityBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script>
+    const fetchSession = (url, opts = {}) => fetch(url, { credentials: "include", ...opts });
+
+    let activityOffset = 0;
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function showErr(msg) {
+      const el = document.getElementById("adminError");
+      if (!msg) {
+        el.classList.add("hidden");
+        el.textContent = "";
+      } else {
+        el.textContent = msg;
+        el.classList.remove("hidden");
+      }
+    }
+
+    async function loadUsers() {
+      const res = await fetchSession("/api/admin/users");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr(data.error || `Could not load users (${res.status}).`);
+        return;
+      }
+      const body = document.getElementById("usersBody");
+      body.innerHTML = "";
+      for (const u of data.users || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.role)}</td>`;
+        body.appendChild(tr);
+      }
+    }
+
+    async function loadActivity(reset) {
+      if (reset) {
+        activityOffset = 0;
+        document.getElementById("activityBody").innerHTML = "";
+      }
+      const lim = 50;
+      const res = await fetchSession(`/api/admin/activity?limit=${lim}&offset=${activityOffset}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr(data.error || `Could not load activity (${res.status}).`);
+        return;
+      }
+      const body = document.getElementById("activityBody");
+      for (const row of data.items || []) {
+        const tr = document.createElement("tr");
+        const meta = row.meta ? JSON.stringify(row.meta) : "—";
+        tr.innerHTML = `
+          <td><span class="muted">${escapeHtml(row.at?.slice(0, 19) || "?")}</span></td>
+          <td>${escapeHtml(row.email || row.userId?.slice?.(0, 8) || "—")}</td>
+          <td><strong>${escapeHtml(row.type)}</strong></td>
+          <td><code>${escapeHtml(meta)}</code></td>`;
+        body.appendChild(tr);
+      }
+      activityOffset += (data.items || []).length;
+    }
+
+    document.getElementById("reloadBtn").addEventListener("click", () => {
+      showErr("");
+      activityOffset = 0;
+      document.getElementById("activityBody").innerHTML = "";
+      loadUsers();
+      loadActivity(false);
+    });
+    document.getElementById("moreBtn").addEventListener("click", () => loadActivity(false));
+
+    loadUsers().then(() => loadActivity(true)).catch(() => showErr("Load failed."));
+  </script>
+</body>
+</html>
