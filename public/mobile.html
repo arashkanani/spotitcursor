@@ -47,9 +47,15 @@
         <p id="triesLeft" class="tries-left" aria-live="polite">3 tries this round</p>
       </div>
 
-      <div class="card" style="margin-top:1rem;">
+      <div class="card mobile-play-card" id="mobilePlayCard" style="margin-top:1rem;">
         <h3>Pick the common shape fast</h3>
         <div class="shape-grid" id="shapeGrid"></div>
+      </div>
+
+      <div id="mobileChampionCard" class="card mobile-champion-card hidden" aria-hidden="true">
+        <p class="mobile-champion-eyebrow">Champion</p>
+        <div id="mobileChampionHero" class="mobile-champion-hero"></div>
+        <p id="mobileChampionStatus" class="status"></p>
       </div>
     </div>
   </div>
@@ -74,6 +80,10 @@
     const mobileStatus = document.getElementById("mobileStatus");
     const triesLeft = document.getElementById("triesLeft");
     const shapeGrid = document.getElementById("shapeGrid");
+    const mobilePlayCard = document.getElementById("mobilePlayCard");
+    const mobileChampionCard = document.getElementById("mobileChampionCard");
+    const mobileChampionHero = document.getElementById("mobileChampionHero");
+    const mobileChampionStatus = document.getElementById("mobileChampionStatus");
 
     const MISTAKES_PER_ROUND = 3;
     const PLAYER_TOKEN_KEY = "spotit_player_token";
@@ -533,6 +543,7 @@
       }
 
       if (state.started && !state.ended) {
+        hideMobileChampion();
         resetRoundTries(state.roundNumber || 0);
       }
 
@@ -559,7 +570,10 @@
       if (!state.started && !state.ended) {
         mobileStatus.textContent = "Waiting for host to start...";
       } else if (state.ended) {
-        mobileStatus.textContent = `Game ended. Your score: ${me ? me.score : 0}`;
+        showMobileChampion(state.leaderboard);
+        if (me) {
+          mobileStatus.textContent = `Game ended. Your score: ${me.score}`;
+        }
       } else if (canPickThisRound) {
         mobileStatus.textContent = `Round ${state.roundNumber} / ${state.totalRounds} — pick the matching shape`;
       }
@@ -586,14 +600,65 @@
       playRoundTimeoutSound();
     });
 
+    function showMobileChampion(leaderboard) {
+      const board = (leaderboard || []).slice().sort(
+        (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0)
+      );
+      const champion = board[0];
+      mobilePlayCard?.classList.add("hidden");
+      if (mobileChampionCard) {
+        mobileChampionCard.classList.remove("hidden");
+        mobileChampionCard.setAttribute("aria-hidden", "false");
+      }
+      if (mobileChampionHero) {
+        mobileChampionHero.replaceChildren();
+        if (champion) {
+          const photoWrap = document.createElement("div");
+          photoWrap.className = "mobile-champion-photo-wrap";
+          if (champion.photo) {
+            const img = document.createElement("img");
+            img.className = "mobile-champion-photo";
+            img.src = champion.photo;
+            img.alt = champion.name || "Champion";
+            photoWrap.appendChild(img);
+          } else {
+            const fallback = document.createElement("span");
+            fallback.className = "mobile-champion-photo-fallback";
+            fallback.textContent = "?";
+            photoWrap.appendChild(fallback);
+          }
+          const nameEl = document.createElement("div");
+          nameEl.className = "mobile-champion-name";
+          nameEl.textContent = champion.name || "Champion";
+          const scoreEl = document.createElement("div");
+          scoreEl.className = "mobile-champion-score";
+          scoreEl.textContent = `${champion.score} points`;
+          mobileChampionHero.append(photoWrap, nameEl, scoreEl);
+        }
+      }
+      if (mobileChampionStatus) {
+        mobileChampionStatus.textContent = champion
+          ? "20 rounds complete — wait for the host to start the next game."
+          : "Game ended.";
+      }
+      if (mobileStatus) {
+        mobileStatus.textContent = champion
+          ? `Champion: ${champion.name} (${champion.score} pts)`
+          : "Game ended.";
+      }
+      triesLeft.textContent = "";
+    }
+
+    function hideMobileChampion() {
+      mobileChampionCard?.classList.add("hidden");
+      mobileChampionCard?.setAttribute("aria-hidden", "true");
+      mobilePlayCard?.classList.remove("hidden");
+    }
+
     socket.on("gameOver", (data) => {
       if (!joined) return;
       canPick = false;
-      if (!data.leaderboard.length) {
-        mobileStatus.textContent = "Game ended.";
-        return;
-      }
-      mobileStatus.textContent = `Winner: ${data.leaderboard[0].name} (${data.leaderboard[0].score})`;
+      showMobileChampion(data.leaderboard);
     });
   </script>
 </body>

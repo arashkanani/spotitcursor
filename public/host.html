@@ -255,7 +255,7 @@
         </div>
       </header>
 
-      <div class="layout">
+      <div id="gamePlayLayout" class="layout">
         <section class="card game-board-card">
           <div class="circles">
             <div class="circle" id="leftCircle">
@@ -271,6 +271,32 @@
           <div class="card-title-row"><span class="card-icon">🏆</span><h3>Live Leaderboard</h3></div>
           <ul class="rank-list" id="rankingList"></ul>
         </aside>
+      </div>
+
+      <div id="gameChampionPanel" class="game-champion-panel hidden" aria-hidden="true">
+        <div class="game-champion-layout">
+          <section class="card game-champion-card">
+            <p class="game-champion-eyebrow">Champion</p>
+            <div class="game-champion-photo-wrap">
+              <div class="game-champion-ring" aria-hidden="true"></div>
+              <img id="championPhoto" class="game-champion-photo" alt="">
+              <div id="championPhotoFallback" class="game-champion-photo-fallback hidden" aria-hidden="true">?</div>
+            </div>
+            <div class="game-champion-meta">
+              <img id="championFlag" class="game-champion-flag" alt="" hidden>
+              <h2 id="championName" class="game-champion-name">—</h2>
+            </div>
+            <p id="championScore" class="game-champion-score"></p>
+          </section>
+
+          <aside class="card leaderboard-panel game-champion-ranking">
+            <div class="card-title-row"><span class="card-icon">🏆</span><h3>Final ranking</h3></div>
+            <ul class="rank-list" id="championRankingList"></ul>
+          </aside>
+        </div>
+        <div class="game-champion-actions">
+          <button type="button" id="goToQrLobbyBtn" class="start-game-btn">Next game — show QR code</button>
+        </div>
       </div>
     </section>
   </div>
@@ -387,6 +413,15 @@
       }
     }
     const startBtn = document.getElementById("startBtn");
+    const gamePlayLayout = document.getElementById("gamePlayLayout");
+    const gameChampionPanel = document.getElementById("gameChampionPanel");
+    const championPhoto = document.getElementById("championPhoto");
+    const championPhotoFallback = document.getElementById("championPhotoFallback");
+    const championFlag = document.getElementById("championFlag");
+    const championName = document.getElementById("championName");
+    const championScore = document.getElementById("championScore");
+    const championRankingList = document.getElementById("championRankingList");
+    const goToQrLobbyBtn = document.getElementById("goToQrLobbyBtn");
     const bodyEl = document.body;
 
     let primaryJoinUrl = "";
@@ -2247,6 +2282,7 @@
         return;
       }
       hideRoundWinnerOverlay();
+      hideGameChampionPanel();
       roundCelebrationActive = false;
       if (roundWinnerHideTimer) {
         clearTimeout(roundWinnerHideTimer);
@@ -2802,6 +2838,99 @@
       });
     }
 
+    function renderRankingIntoList(listEl, leaderboard) {
+      if (!listEl) return;
+      const board = enrichLeaderboard(leaderboard);
+      listEl.innerHTML = "";
+      if (!board.length) {
+        listEl.innerHTML = "<li class='rank-item rank-empty'><div class='leaderboard-empty'>No players</div></li>";
+        return;
+      }
+      board.forEach((player, index) => {
+        const li = document.createElement("li");
+        li.className = "rank-item";
+        li.innerHTML = renderLeaderboardItem(player, index);
+        listEl.appendChild(li);
+      });
+    }
+
+    function setChampionPhoto(photoUrl) {
+      const url = String(photoUrl || "");
+      if (!championPhoto || !championPhotoFallback) return;
+      championPhoto.onload = () => {
+        championPhoto.classList.remove("hidden");
+        championPhotoFallback.classList.add("hidden");
+      };
+      championPhoto.onerror = () => {
+        championPhoto.classList.add("hidden");
+        championPhotoFallback.classList.remove("hidden");
+      };
+      if (url) {
+        championPhoto.src = url;
+        championPhoto.alt = "Champion photo";
+        if (championPhoto.complete && championPhoto.naturalWidth > 0) {
+          championPhoto.classList.remove("hidden");
+          championPhotoFallback.classList.add("hidden");
+        }
+      } else {
+        championPhoto.removeAttribute("src");
+        championPhoto.classList.add("hidden");
+        championPhotoFallback.classList.remove("hidden");
+      }
+    }
+
+    function hideGameChampionPanel() {
+      if (!gameChampionPanel) return;
+      gameChampionPanel.classList.add("hidden");
+      gameChampionPanel.setAttribute("aria-hidden", "true");
+      gamePlayLayout?.classList.remove("hidden");
+    }
+
+    function showGameChampionPanel(leaderboard) {
+      if (!gameChampionPanel) return;
+      hideRoundWinnerOverlay();
+      roundCelebrationActive = false;
+      clearRoundCelebrationTimers();
+
+      const board = enrichLeaderboard(leaderboard);
+      const champion = board[0] || null;
+
+      if (champion) {
+        championName.textContent = champion.name || "Champion";
+        championScore.textContent = `${champion.score} points · 20 rounds complete`;
+        setChampionPhoto(champion.photo);
+        if (champion.countryCode && championFlag) {
+          championFlag.src = countryFlagUrl(champion.countryCode);
+          championFlag.alt = champion.countryName || champion.countryCode;
+          championFlag.hidden = false;
+        } else if (championFlag) {
+          championFlag.hidden = true;
+        }
+      } else {
+        championName.textContent = "No champion";
+        championScore.textContent = "No players scored this game.";
+        setChampionPhoto("");
+        if (championFlag) championFlag.hidden = true;
+      }
+
+      renderRankingIntoList(championRankingList, board);
+      renderRanking(board);
+
+      gamePlayLayout?.classList.add("hidden");
+      gameChampionPanel.classList.remove("hidden");
+      gameChampionPanel.setAttribute("aria-hidden", "false");
+
+      if (gameStatusRound) {
+        gameStatusRound.textContent = "Game complete";
+      }
+      if (gameStatusPlayers) {
+        gameStatusPlayers.hidden = false;
+        gameStatusPlayers.textContent = champion
+          ? `${champion.name} is champion`
+          : "All rounds finished";
+      }
+    }
+
     socket.on("eventBranding", (branding) => {
       if (hostPinnedView === "setup") return;
       applyEventBranding(branding);
@@ -2815,6 +2944,7 @@
       if (state.eventBranding) applyEventBranding(state.eventBranding);
 
       if (state.started && !state.ended) {
+        hideGameChampionPanel();
         showGameView();
         renderRanking(latestLeaderboard);
         setGameStatusHud(state.roundNumber, state.totalRounds, state.playerCount);
@@ -2836,14 +2966,16 @@
         return;
       }
 
+      if (state.ended) {
+        showGameView();
+        showGameChampionPanel(state.leaderboard);
+        return;
+      }
+
       lastRenderedRoundShapesKey = "";
+      hideGameChampionPanel();
       showLobbyView();
       renderLobbyPlayers(latestLeaderboard);
-
-      if (state.ended) {
-        lobbyStatus.textContent = "Game finished. Players can stay connected — press Start for a new game.";
-        startBtn.disabled = !(state.leaderboard && state.leaderboard.length);
-      }
     });
 
     const roundWinnerOverlay = document.getElementById("roundWinnerOverlay");
@@ -2995,15 +3127,18 @@
       if (hostPinnedView === "setup") return;
       setLeaderboardFromServer(data.leaderboard);
       (data.leaderboard || []).forEach(cachePlayerPhoto);
+      showGameView();
+      showGameChampionPanel(data.leaderboard);
+    });
+
+    goToQrLobbyBtn?.addEventListener("click", () => {
+      hideGameChampionPanel();
+      hideRoundWinnerOverlay();
+      socket.emit("hostResetGame");
       showLobbyView();
-      if (!latestLeaderboard.length) {
-        lobbyStatus.textContent = "Game over. No players joined.";
-        startBtn.disabled = true;
-        return;
-      }
-      lobbyStatus.textContent = `Game over. Winner: ${latestLeaderboard[0].name} (${latestLeaderboard[0].score}). Press Start for a rematch.`;
-      renderLobbyPlayers(latestLeaderboard);
-      startBtn.disabled = false;
+      lobbyStatus.textContent = "Next game — players scan the QR code to join.";
+      startBtn.disabled = true;
+      renderLobbyPlayers([]);
     });
 
     window.addEventListener("resize", () => {
@@ -3036,6 +3171,7 @@
 
     startBtn.addEventListener("click", () => {
       primeGameAudio();
+      hideGameChampionPanel();
       showGameView();
       socket.emit("hostStartGame");
     });

@@ -1390,6 +1390,60 @@ button:disabled {
   margin: 0 auto;
 }
 
+.mobile-champion-card {
+  margin-top: 1rem;
+  text-align: center;
+  border-color: rgba(240, 193, 77, 0.4);
+  background: linear-gradient(165deg, rgba(240, 193, 77, 0.12), rgba(0, 0, 0, 0.25));
+}
+
+.mobile-champion-eyebrow {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+}
+
+.mobile-champion-photo-wrap {
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 0.75rem;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid rgba(240, 193, 77, 0.7);
+}
+
+.mobile-champion-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mobile-champion-photo-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--accent-gold);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.mobile-champion-name {
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.mobile-champion-score {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
 .mobile-body .card {
   margin-bottom: 0.5rem;
 }
@@ -1689,6 +1743,140 @@ input::placeholder {
 @keyframes winnerParticlesPulse {
   from { opacity: 0.45; }
   to { opacity: 0.9; }
+}
+
+/* Game champion — end of 20 rounds */
+.game-champion-panel {
+  margin-top: 1rem;
+}
+
+.game-champion-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.game-champion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem 1.25rem 1.35rem;
+  background: linear-gradient(165deg, rgba(240, 193, 77, 0.14) 0%, rgba(0, 0, 0, 0.35) 55%);
+  border-color: rgba(240, 193, 77, 0.45);
+  box-shadow: 0 0 40px rgba(240, 193, 77, 0.12);
+}
+
+.game-champion-eyebrow {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+}
+
+.game-champion-photo-wrap {
+  position: relative;
+  width: min(100%, 220px);
+  aspect-ratio: 1;
+  margin: 0 auto 1rem;
+}
+
+.game-champion-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: rgba(240, 193, 77, 0.9);
+  border-right-color: rgba(92, 225, 230, 0.55);
+  animation: winnerRingSpin 8s linear infinite;
+  pointer-events: none;
+}
+
+.game-champion-photo,
+.game-champion-photo-fallback {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid rgba(240, 193, 77, 0.75);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  animation: winnerPhotoPop 0.7s ease-out both;
+}
+
+.game-champion-photo-fallback {
+  display: grid;
+  place-items: center;
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--accent-gold);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.game-champion-photo.hidden,
+.game-champion-photo-fallback.hidden {
+  display: none;
+}
+
+.game-champion-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.game-champion-flag {
+  width: 40px;
+  height: 30px;
+  border-radius: 4px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.game-champion-name {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: #fff;
+}
+
+.game-champion-score {
+  margin: 0.65rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+.game-champion-ranking .rank-list {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+}
+
+.game-champion-actions {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: center;
+}
+
+.game-champion-actions .start-game-btn {
+  min-width: min(100%, 360px);
+  padding: 0.9rem 1.75rem;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 900px) {
+  .game-champion-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .game-champion-ranking .rank-list {
+    max-height: 280px;
+  }
 }
 
 @keyframes winnerTextGlow {

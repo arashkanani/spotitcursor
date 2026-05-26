@@ -342,6 +342,7 @@ function getLeaderboard(options) {
 }
 
 function buildGameStatePayload() {
+  const includePhoto = game.ended;
   return {
     started: game.started,
     ended: game.ended,
@@ -354,7 +355,7 @@ function buildGameStatePayload() {
         }
       : null,
     mobileShapes: game.currentRound ? game.currentRound.mobileShapes : [],
-    leaderboard: getLeaderboard(),
+    leaderboard: getLeaderboard({ includePhoto }),
     playerCount: players.size,
     registrationOpen: !game.started || game.ended
   };
