@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script src="/player-ui.js"></script>
+  <script src="/ad-background-slideshow.js"></script>
 </head>
 <body>
   <div class="bg-mesh"></div>
@@ -20,29 +21,11 @@
   <div class="page">
     <section id="setupView" class="host-setup">
       <div class="setup-card card">
-        <div id="patternPickerPanel" class="pattern-picker-panel hidden">
-          <div class="setup-intro">
-            <p class="event-eyebrow">Event planner · Start here</p>
-            <h2 class="setup-title">Choose your game screen layout</h2>
-            <p class="setup-subtitle">Pick one of 5 patterns. Next you’ll set the <strong>title</strong>, <strong>background</strong>, and <strong>sponsor shapes</strong> inside a live preview.</p>
-          </div>
-          <div id="patternLaunchGrid" class="pattern-launch-grid" role="listbox" aria-label="Game screen patterns"></div>
-          <p class="setup-hint" id="patternPickerHint">Loading layouts…</p>
-        </div>
-
         <div id="eventCustomizePanel" class="event-customize-panel">
           <div class="setup-intro setup-intro-dashboard">
             <p class="event-eyebrow">Event planner</p>
             <h2 class="setup-title">Design your game screen</h2>
-            <p class="setup-subtitle">Set the <strong>title</strong>, <strong>background</strong>, <strong>layout</strong>, and <strong>sponsor shapes</strong>. The live preview below matches the real game.</p>
-          </div>
-          <div class="customize-top-bar">
-            <label class="layout-pattern-field" for="layoutPatternSelect">
-              <span class="layout-pattern-label">Screen layout</span>
-              <select id="layoutPatternSelect" class="layout-pattern-select"></select>
-            </label>
-            <button type="button" id="backToPatternsBtn" class="ghost-btn hidden">More layouts</button>
-            <p class="customize-pattern-badge" id="selectedPatternBadge">Classic split</p>
+            <p class="setup-subtitle">Set the <strong>title</strong>, <strong>background</strong>, and <strong>sponsor shapes</strong>. The live preview below matches the real game.</p>
           </div>
 
           <div class="setup-section">
@@ -52,16 +35,22 @@
 
           <div class="setup-section">
             <h3 class="setup-section-title">Background</h3>
-            <p class="setup-hint">Pick a preset or upload your own image (JPG, PNG, WebP).</p>
+            <p class="setup-hint">Pick a preset or upload advertising images (JPG, PNG, WebP). Upload several — during the live game they rotate every 5 seconds with a fade.</p>
             <div id="backgroundPicker" class="theme-option-grid theme-bg-grid" role="listbox" aria-label="Background"></div>
             <div class="background-upload-row">
-              <label class="photo-upload-btn" for="customBackgroundInput">Upload custom background</label>
-              <span class="setup-hint custom-upload-hint">PNG with transparent areas works best. Solid black fills may blend into the dark screen — increase zoom or use a cut-out PNG.</span>
+              <label class="photo-upload-btn" for="customBackgroundInput">Add advertising background</label>
+              <span class="setup-hint custom-upload-hint">You can select multiple files at once. PNG with transparent areas works best.</span>
               <button type="button" id="clearCustomBackgroundBtn" class="clear-background-btn" hidden>
-                Remove upload
+                Remove all uploads
               </button>
-              <input id="customBackgroundInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+              <input id="customBackgroundInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
               <span id="customBackgroundStatus" class="setup-hint"></span>
+            </div>
+            <p id="customBgSlideshowHint" class="custom-bg-slideshow-hint hidden">2+ images uploaded — they will fade between each other every 5s on the game screen.</p>
+            <div id="customBackgroundUploadsPanel" class="custom-bg-uploads-panel">
+              <h4 class="custom-bg-list-title">Uploaded backgrounds <span id="customBackgroundListCount" class="custom-bg-list-count"></span></h4>
+              <p id="customBackgroundListEmpty" class="custom-bg-list-empty setup-hint">No images uploaded yet. Use the button above to add advertising backgrounds.</p>
+              <ul id="customBackgroundList" class="custom-bg-list" aria-label="Uploaded advertising backgrounds"></ul>
             </div>
           </div>
 
@@ -142,14 +131,14 @@
               </div>
               </div>
             </div>
-            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls">
-              <p class="custom-bg-adjust-hint" id="customBgAdjustHint">Upload a custom background above to adjust position and zoom. The live preview updates as you change settings.</p>
+            <div id="customBackgroundAdjustPanel" class="custom-bg-adjust-controls hidden" aria-hidden="true">
+              <p id="customBgAdjustHint" class="custom-bg-adjust-hint">Click an uploaded background to show it in the preview above, then adjust position and zoom.</p>
               <div class="custom-bg-adjust-row">
-                <label for="bgPosX">Horizontal position <output id="bgPosXValue">50</output>%</label>
+                <label for="bgPosX">Horizontal <output id="bgPosXValue">50</output>%</label>
                 <input type="range" id="bgPosX" min="-50" max="150" value="50" step="1">
               </div>
               <div class="custom-bg-adjust-row">
-                <label for="bgPosY">Vertical position <output id="bgPosYValue">50</output>%</label>
+                <label for="bgPosY">Vertical <output id="bgPosYValue">50</output>%</label>
                 <input type="range" id="bgPosY" min="-50" max="150" value="50" step="1">
               </div>
               <div class="custom-bg-adjust-row">
@@ -188,7 +177,7 @@
           </div>
 
           <div class="edit-circle-preview-block">
-            <p class="edit-preview-label">Game circle preview (live layout)</p>
+            <p class="edit-preview-label">Game circle preview</p>
             <div class="circle edit-preview-circle" id="editPreviewCircle">
               <div class="circle-shapes-layer"></div>
             </div>
@@ -319,16 +308,16 @@
     const chosenSponsorName = document.getElementById("chosenSponsorName");
     const chosenSponsorStatus = document.getElementById("chosenSponsorStatus");
     const editChosenShapesBtn = document.getElementById("editChosenShapesBtn");
-    const patternPickerPanel = document.getElementById("patternPickerPanel");
     const eventCustomizePanel = document.getElementById("eventCustomizePanel");
-    const patternLaunchGrid = document.getElementById("patternLaunchGrid");
-    const patternPickerHint = document.getElementById("patternPickerHint");
-    const backToPatternsBtn = document.getElementById("backToPatternsBtn");
-    const layoutPatternSelect = document.getElementById("layoutPatternSelect");
-    const selectedPatternBadge = document.getElementById("selectedPatternBadge");
     const customBackgroundInput = document.getElementById("customBackgroundInput");
+    const customBackgroundUploadsPanel = document.getElementById("customBackgroundUploadsPanel");
+    const customBackgroundList = document.getElementById("customBackgroundList");
+    const customBackgroundListEmpty = document.getElementById("customBackgroundListEmpty");
+    const customBackgroundListCount = document.getElementById("customBackgroundListCount");
+    const customBgSlideshowHint = document.getElementById("customBgSlideshowHint");
     const clearCustomBackgroundBtn = document.getElementById("clearCustomBackgroundBtn");
     const customBackgroundAdjustPanel = document.getElementById("customBackgroundAdjustPanel");
+    const customBgAdjustHint = document.getElementById("customBgAdjustHint");
     const bgPosXInput = document.getElementById("bgPosX");
     const bgPosYInput = document.getElementById("bgPosY");
     const bgScaleInput = document.getElementById("bgScale");
@@ -476,30 +465,87 @@
     let editContext = null;
     let editShapeItems = [];
     let editBlobUrls = [];
-    let themeCatalog = { patterns: [], backgrounds: [], presets: [] };
-    let selectedThemePattern = "classic";
+    const FIXED_THEME_PATTERN = "classic";
+    let themeCatalog = { backgrounds: [], presets: [] };
+    let selectedThemePattern = FIXED_THEME_PATTERN;
     let selectedThemeBackground = "midnight";
     let customBackgroundUrl = null;
+    let customBackgroundUrls = [];
+    let customBackgrounds = [];
+    let selectedBackgroundUrl = null;
     let customBackgroundPosX = 50;
     let customBackgroundPosY = 50;
     let customBackgroundScale = 100;
     let previewBgCacheVersion = null;
     let bgAdjustPersistTimer = null;
+    let serverSupportsMultiBg = null;
+    const optimisticBackgroundBlobUrls = new Map();
     let circlesPanelTransparent = false;
     let rankingPanelTransparent = false;
     let setupPhase = "customize";
 
-    const PATTERN_DEFAULT_BG = {
-      classic: "midnight",
-      spotlight: "ocean",
-      stage: "sunset",
-      wide: "royal",
-      cinema: "emerald"
-    };
+    const DEFAULT_THEME_BACKGROUND = "midnight";
 
     function stripBackgroundUrlQuery(url) {
       if (!url) return null;
       return String(url).split("?")[0] || null;
+    }
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function extractBackgroundsFromBranding(branding) {
+      const entries = [];
+      const seen = new Set();
+      const addEntry = (url, posX, posY, scale) => {
+        const base = stripBackgroundUrlQuery(url);
+        if (!base || seen.has(base)) return;
+        seen.add(base);
+        entries.push({
+          url: base,
+          posX: clampBgPercent(posX, 50),
+          posY: clampBgPercent(posY, 50),
+          scale: clampBgScale(scale, 100)
+        });
+      };
+
+      if (Array.isArray(branding?.customBackgrounds)) {
+        for (const item of branding.customBackgrounds) {
+          addEntry(item?.url, item?.posX, item?.posY, item?.scale);
+        }
+      }
+      if (Array.isArray(branding?.customBackgroundUrls)) {
+        for (const raw of branding.customBackgroundUrls) {
+          addEntry(raw, branding?.customBackgroundPosX, branding?.customBackgroundPosY, branding?.customBackgroundScale);
+        }
+      }
+      addEntry(
+        branding?.customBackgroundUrl,
+        branding?.customBackgroundPosX,
+        branding?.customBackgroundPosY,
+        branding?.customBackgroundScale
+      );
+      return entries;
+    }
+
+    function applyBackgroundEntries(entries) {
+      customBackgrounds = entries;
+      customBackgroundUrls = entries.map((entry) => entry.url);
+      customBackgroundUrl = entries[0]?.url || null;
+      if (
+        !selectedBackgroundUrl
+        || !entries.some(
+          (entry) => stripBackgroundUrlQuery(entry.url) === stripBackgroundUrlQuery(selectedBackgroundUrl)
+        )
+      ) {
+        selectedBackgroundUrl = customBackgroundUrl;
+      }
+      syncLegacyTransformFromEntry(getSelectedBackgroundEntry());
     }
 
     const BG_POS_MIN = -50;
@@ -521,19 +567,111 @@
 
     function getBackgroundTransformPayload() {
       return {
-        customBackgroundPosX,
-        customBackgroundPosY,
-        customBackgroundScale
+        customBackgrounds: customBackgrounds.map((entry) => ({
+          url: entry.url,
+          posX: entry.posX,
+          posY: entry.posY,
+          scale: entry.scale
+        }))
       };
     }
 
-    function syncBgAdjustControls() {
-      if (bgPosXInput) bgPosXInput.value = String(customBackgroundPosX);
-      if (bgPosYInput) bgPosYInput.value = String(customBackgroundPosY);
-      if (bgScaleInput) bgScaleInput.value = String(customBackgroundScale);
-      if (bgPosXValue) bgPosXValue.textContent = String(customBackgroundPosX);
-      if (bgPosYValue) bgPosYValue.textContent = String(customBackgroundPosY);
-      if (bgScaleValue) bgScaleValue.textContent = String(customBackgroundScale);
+    function syncLegacyTransformFromEntry(entry) {
+      if (!entry) return;
+      customBackgroundPosX = entry.posX;
+      customBackgroundPosY = entry.posY;
+      customBackgroundScale = entry.scale;
+    }
+
+    function findBackgroundEntryByUrl(url) {
+      const target = stripBackgroundUrlQuery(url);
+      if (!target) return null;
+      return customBackgrounds.find(
+        (entry) => stripBackgroundUrlQuery(entry.url) === target
+      ) || null;
+    }
+
+    function getSelectedBackgroundEntry() {
+      if (selectedBackgroundUrl) {
+        const selected = findBackgroundEntryByUrl(selectedBackgroundUrl);
+        if (selected) return selected;
+      }
+      return customBackgrounds[0] || null;
+    }
+
+    function selectedBackgroundIndex() {
+      const entry = getSelectedBackgroundEntry();
+      if (!entry) return -1;
+      return customBackgrounds.findIndex(
+        (item) => stripBackgroundUrlQuery(item.url) === stripBackgroundUrlQuery(entry.url)
+      );
+    }
+
+    function syncMainAdjustPanelOutputs(entry = getSelectedBackgroundEntry()) {
+      if (!entry) return;
+      if (bgPosXInput) bgPosXInput.value = String(entry.posX);
+      if (bgPosYInput) bgPosYInput.value = String(entry.posY);
+      if (bgScaleInput) bgScaleInput.value = String(entry.scale);
+      if (bgPosXValue) bgPosXValue.textContent = String(entry.posX);
+      if (bgPosYValue) bgPosYValue.textContent = String(entry.posY);
+      if (bgScaleValue) bgScaleValue.textContent = String(entry.scale);
+    }
+
+    function syncMainAdjustPanelHint(entry = getSelectedBackgroundEntry()) {
+      if (!customBgAdjustHint) return;
+      if (!entry) {
+        customBgAdjustHint.textContent = "Click an uploaded background to show it in the preview above, then adjust position and zoom.";
+        return;
+      }
+      const index = selectedBackgroundIndex();
+      const label = backgroundListLabel(entry, index >= 0 ? index : 0);
+      customBgAdjustHint.textContent = `Adjusting “${label}” in the live preview above.`;
+    }
+
+    function setSelectedBackgroundUrl(url, options = {}) {
+      const entry = findBackgroundEntryByUrl(url);
+      if (!entry) return;
+      selectedBackgroundUrl = entry.url;
+      customBackgroundUrl = entry.url;
+      selectedThemeBackground = "custom";
+      syncLegacyTransformFromEntry(entry);
+      syncThemePickerUi();
+      renderCustomBackgroundList();
+      applyPreviewBackgroundLayer(previewBgCacheVersion);
+      paintAllCustomBackgroundMeshes(previewBgCacheVersion);
+      applyCustomBackgroundTransform();
+      syncMainAdjustPanelOutputs(entry);
+      syncMainAdjustPanelHint(entry);
+      if (isSetupCustomizeView()) refreshDashboardPreview();
+      if (options.scrollPreview !== false && setupLiveDemo) {
+        setupLiveDemo.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      if (options.scrollIntoView !== false && customBackgroundList) {
+        const item = Array.from(customBackgroundList.querySelectorAll(".custom-bg-list-item"))
+          .find((el) => stripBackgroundUrlQuery(el.dataset.url) === stripBackgroundUrlQuery(entry.url));
+        item?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+
+    function updateBackgroundEntry(url, patch) {
+      const target = stripBackgroundUrlQuery(url);
+      const index = customBackgrounds.findIndex(
+        (entry) => stripBackgroundUrlQuery(entry.url) === target
+      );
+      if (index < 0) return;
+      customBackgrounds[index] = {
+        ...customBackgrounds[index],
+        ...patch,
+        url: target
+      };
+      if (stripBackgroundUrlQuery(selectedBackgroundUrl) === target) {
+        syncLegacyTransformFromEntry(customBackgrounds[index]);
+      }
+      if (stripBackgroundUrlQuery(selectedBackgroundUrl) === target) {
+        applyPreviewBackgroundLayer(previewBgCacheVersion);
+        paintAllCustomBackgroundMeshes(previewBgCacheVersion);
+        applyCustomBackgroundTransform();
+      }
     }
 
     function isSetupCustomizeView() {
@@ -541,23 +679,58 @@
     }
 
     function updateCustomBackgroundAdjustPanel() {
-      const hasCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const entry = getSelectedBackgroundEntry();
+      const hasCustom = selectedThemeBackground === "custom" && customBackgrounds.length > 0;
       const onDashboard = isSetupCustomizeView();
+      const show = hasCustom && onDashboard;
+      document.body.classList.toggle("host-editing-custom-bg", show);
       if (customBackgroundAdjustPanel) {
-        customBackgroundAdjustPanel.classList.toggle("hidden", !onDashboard);
-        customBackgroundAdjustPanel.classList.toggle("is-inactive", onDashboard && !hasCustom);
-        customBackgroundAdjustPanel.querySelectorAll("input[type='range'], button").forEach((el) => {
-          el.disabled = !hasCustom;
-        });
+        customBackgroundAdjustPanel.classList.toggle("hidden", !show);
+        customBackgroundAdjustPanel.setAttribute("aria-hidden", show ? "false" : "true");
       }
-      const hint = document.getElementById("customBgAdjustHint");
-      if (hint) {
-        hint.textContent = hasCustom
-          ? "Adjust position and zoom — the preview above is a scaled copy of the live game screen (same size as your display, shown at ¼ scale)."
-          : "Upload a custom background above to adjust position and zoom. Preset backgrounds use the color swatches only.";
+      if (show) {
+        syncMainAdjustPanelOutputs(entry);
+        syncMainAdjustPanelHint(entry);
       }
-      document.body.classList.toggle("host-editing-custom-bg", hasCustom && onDashboard);
     }
+
+    function bindMainBackgroundAdjustPanel() {
+      const onSliderInput = () => {
+        const entry = getSelectedBackgroundEntry();
+        if (!entry || !bgPosXInput || !bgPosYInput || !bgScaleInput) return;
+        if (bgPosXValue) bgPosXValue.textContent = bgPosXInput.value;
+        if (bgPosYValue) bgPosYValue.textContent = bgPosYInput.value;
+        if (bgScaleValue) bgScaleValue.textContent = bgScaleInput.value;
+        updateBackgroundEntry(entry.url, {
+          posX: clampBgPercent(bgPosXInput.value, 50),
+          posY: clampBgPercent(bgPosYInput.value, 50),
+          scale: clampBgScale(bgScaleInput.value, 100)
+        });
+        applyPreviewBackgroundLayer(previewBgCacheVersion);
+        paintAllCustomBackgroundMeshes(previewBgCacheVersion);
+        applyCustomBackgroundTransform();
+        refreshAdBackgroundPlayback();
+        schedulePersistCustomBackgrounds();
+      };
+
+      bgPosXInput?.addEventListener("input", onSliderInput);
+      bgPosYInput?.addEventListener("input", onSliderInput);
+      bgScaleInput?.addEventListener("input", onSliderInput);
+
+      resetBgAdjustBtn?.addEventListener("click", () => {
+        const entry = getSelectedBackgroundEntry();
+        if (!entry) return;
+        updateBackgroundEntry(entry.url, { posX: 50, posY: 50, scale: 100 });
+        syncMainAdjustPanelOutputs(entry);
+        applyPreviewBackgroundLayer(previewBgCacheVersion);
+        paintAllCustomBackgroundMeshes(previewBgCacheVersion);
+        applyCustomBackgroundTransform();
+        refreshAdBackgroundPlayback();
+        schedulePersistCustomBackgrounds();
+      });
+    }
+
+    bindMainBackgroundAdjustPanel();
 
     function repositionDemoCircleShapes() {
       for (const circleEl of [demoLeftCircle, demoRightCircle]) {
@@ -648,7 +821,8 @@
       const mesh = setupPreviewScene?.querySelector(".setup-preview-bg");
       if (!setupPreviewScene || !mesh) return;
 
-      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const previewEntry = getSelectedBackgroundEntry();
+      const isCustom = selectedThemeBackground === "custom" && !!previewEntry;
       const presetBg = selectedThemeBackground || "midnight";
       setupPreviewScene.dataset.pattern = selectedThemePattern || "classic";
       setupPreviewScene.dataset.bg = isCustom ? "custom" : presetBg;
@@ -671,16 +845,16 @@
         return;
       }
 
-      const bustUrl = customBgDisplayUrl(customBackgroundUrl, cacheVersion ?? previewBgCacheVersion);
+      const bustUrl = customBgDisplayUrl(previewEntry.url, cacheVersion ?? previewBgCacheVersion);
       if (!bustUrl) return;
 
       const urlValue = `url("${bustUrl}")`;
       setupPreviewScene.style.setProperty("--custom-bg-url", urlValue);
-      setupPreviewScene.style.setProperty("--custom-bg-pos-x", `${customBackgroundPosX}%`);
-      setupPreviewScene.style.setProperty("--custom-bg-pos-y", `${customBackgroundPosY}%`);
-      setupPreviewScene.style.setProperty("--custom-bg-size", `${customBackgroundScale}% auto`);
+      setupPreviewScene.style.setProperty("--custom-bg-pos-x", `${previewEntry.posX}%`);
+      setupPreviewScene.style.setProperty("--custom-bg-pos-y", `${previewEntry.posY}%`);
+      setupPreviewScene.style.setProperty("--custom-bg-size", `${previewEntry.scale}% auto`);
 
-      paintCustomBgMesh(mesh, bustUrl);
+      paintCustomBgMesh(mesh, bustUrl, previewEntry);
 
       if (setupPreviewBgImg) {
         setupPreviewBgImg.hidden = true;
@@ -689,19 +863,20 @@
     }
 
     function applyCustomBackgroundTransform() {
-      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const previewEntry = getSelectedBackgroundEntry();
+      const isCustom = selectedThemeBackground === "custom" && !!previewEntry;
       const pageChrome = !isSetupCustomizeView() || !isCustom;
       const targets = getThemeApplyTargets(pageChrome);
 
       for (const el of targets) {
         if (isCustom) {
-          el.style.setProperty("--custom-bg-pos-x", `${customBackgroundPosX}%`);
-          el.style.setProperty("--custom-bg-pos-y", `${customBackgroundPosY}%`);
-          el.style.setProperty("--custom-bg-size", `${customBackgroundScale}% auto`);
+          el.style.setProperty("--custom-bg-pos-x", `${previewEntry.posX}%`);
+          el.style.setProperty("--custom-bg-pos-y", `${previewEntry.posY}%`);
+          el.style.setProperty("--custom-bg-size", `${previewEntry.scale}% auto`);
           if (el === setupPreviewScene) {
             el.style.setProperty(
               "--custom-bg-url",
-              `url("${customBgDisplayUrl(customBackgroundUrl, previewBgCacheVersion)}")`
+              `url("${customBgDisplayUrl(previewEntry.url, previewBgCacheVersion)}")`
             );
           }
         } else {
@@ -731,27 +906,23 @@
     }
 
     function setBackgroundTransform(transform, options = {}) {
+      const entry = getSelectedBackgroundEntry();
+      if (!entry) return;
+      const patch = {};
       if (transform.customBackgroundPosX !== undefined) {
-        customBackgroundPosX = clampBgPercent(transform.customBackgroundPosX);
+        patch.posX = clampBgPercent(transform.customBackgroundPosX);
       }
       if (transform.customBackgroundPosY !== undefined) {
-        customBackgroundPosY = clampBgPercent(transform.customBackgroundPosY);
+        patch.posY = clampBgPercent(transform.customBackgroundPosY);
       }
       if (transform.customBackgroundScale !== undefined) {
-        customBackgroundScale = clampBgScale(transform.customBackgroundScale);
+        patch.scale = clampBgScale(transform.customBackgroundScale);
       }
-      syncBgAdjustControls();
+      updateBackgroundEntry(entry.url, patch);
       applyCustomBackgroundTransform();
-      if (options.persist) schedulePersistBackgroundAdjust();
+      refreshAdBackgroundPlayback();
+      if (options.persist) schedulePersistCustomBackgrounds();
       if (options.refreshPreview) updateSetupPreview();
-    }
-
-    function schedulePersistBackgroundAdjust() {
-      if (bgAdjustPersistTimer) clearTimeout(bgAdjustPersistTimer);
-      bgAdjustPersistTimer = setTimeout(() => {
-        bgAdjustPersistTimer = null;
-        void persistThemeSelection();
-      }, 400);
     }
 
     function resolveAssetUrl(path) {
@@ -765,11 +936,308 @@
     function customBgDisplayUrl(url, cacheVersion) {
       const base = stripBackgroundUrlQuery(url);
       if (!base) return null;
+      if (base.startsWith("blob:")) return base;
       const v = cacheVersion
         ? new Date(cacheVersion).getTime()
         : Date.now();
       return `${resolveAssetUrl(base)}?v=${v}`;
     }
+
+    function syncCustomBackgroundsFromBranding(branding) {
+      applyBackgroundEntries(extractBackgroundsFromBranding(branding));
+    }
+
+    function mergeUploadResponse(branding) {
+      const incoming = extractBackgroundsFromBranding(branding);
+      if (!incoming.length) return false;
+      const merged = [...customBackgrounds];
+      const seen = new Set(merged.map((entry) => entry.url));
+      for (const entry of incoming) {
+        if (!seen.has(entry.url)) {
+          merged.push(entry);
+          seen.add(entry.url);
+        }
+      }
+      applyBackgroundEntries(merged);
+      return true;
+    }
+
+    function revokeOptimisticBackgroundUrl(url) {
+      const base = stripBackgroundUrlQuery(url);
+      const blobUrl = optimisticBackgroundBlobUrls.get(base);
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+        optimisticBackgroundBlobUrls.delete(base);
+      }
+    }
+
+    function clearOptimisticBackgroundUrls() {
+      for (const blobUrl of optimisticBackgroundBlobUrls.values()) {
+        URL.revokeObjectURL(blobUrl);
+      }
+      optimisticBackgroundBlobUrls.clear();
+    }
+
+    function removeOptimisticBackgroundEntries() {
+      const kept = customBackgrounds.filter((entry) => {
+        const isBlob = entry.url && entry.url.startsWith("blob:");
+        if (isBlob) revokeOptimisticBackgroundUrl(entry.url);
+        return !isBlob;
+      });
+      if (kept.length !== customBackgrounds.length) {
+        applyBackgroundEntries(kept);
+      }
+    }
+
+    function addOptimisticBackgroundFromFile(file) {
+      const blobUrl = URL.createObjectURL(file);
+      optimisticBackgroundBlobUrls.set(blobUrl, blobUrl);
+      const merged = [
+        ...customBackgrounds.filter((entry) => !entry.url?.startsWith("blob:")),
+        { url: blobUrl, posX: 50, posY: 50, scale: 100 }
+      ];
+      applyBackgroundEntries(merged);
+      selectedThemeBackground = "custom";
+      selectedBackgroundUrl = blobUrl;
+      customBackgroundUrl = blobUrl;
+      return blobUrl;
+    }
+
+    function addBackgroundFromUploadResponse(branding) {
+      if (mergeUploadResponse(branding)) {
+        removeOptimisticBackgroundEntries();
+        return true;
+      }
+      const fallbackUrl = stripBackgroundUrlQuery(branding?.customBackgroundUrl);
+      if (!fallbackUrl) return false;
+      const merged = customBackgrounds.filter((entry) => !entry.url?.startsWith("blob:"));
+      if (!merged.some((entry) => entry.url === fallbackUrl)) {
+        merged.push({
+          url: fallbackUrl,
+          posX: 50,
+          posY: 50,
+          scale: 100
+        });
+      }
+      applyBackgroundEntries(merged);
+      removeOptimisticBackgroundEntries();
+      return true;
+    }
+
+    function uploadResponseLooksValid(branding) {
+      if (!branding || branding.themeBackground !== "custom") return false;
+      return extractBackgroundsFromBranding(branding).length > 0;
+    }
+
+    function staleServerUploadMessage() {
+      return "Upload reached an old server build (empty background list). Stop every Node process on this port, run npm start again, then hard-refresh this page (Ctrl+Shift+R).";
+    }
+
+    function getCustomBackgroundSlides() {
+      return customBackgrounds.map((entry) => ({
+        url: customBgDisplayUrl(entry.url, previewBgCacheVersion),
+        posX: entry.posX,
+        posY: entry.posY,
+        scale: entry.scale
+      })).filter((slide) => slide.url);
+    }
+
+    function isAdSlideshowEligible() {
+      return selectedThemeBackground === "custom"
+        && customBackgrounds.length > 1
+        && gameView
+        && !gameView.classList.contains("hidden");
+    }
+
+    function refreshAdBackgroundPlayback() {
+      if (typeof AdBackgroundSlideshow === "undefined") return;
+      const running = isAdSlideshowEligible();
+      AdBackgroundSlideshow.update({
+        slides: running ? getCustomBackgroundSlides() : [],
+        running
+      });
+      if (!running) {
+        paintAllCustomBackgroundMeshes(previewBgCacheVersion);
+      } else {
+        document.querySelectorAll("body > .bg-mesh").forEach(clearCustomBgMesh);
+      }
+    }
+
+    function backgroundListLabel(entry, index) {
+      const file = stripBackgroundUrlQuery(entry.url);
+      const name = file ? file.split("/").pop() : `Background ${index + 1}`;
+      return name || `Background ${index + 1}`;
+    }
+
+    function updateCustomUploadSwatch() {
+      if (!backgroundPicker) return;
+      const swatch = backgroundPicker.querySelector(".theme-bg-custom .theme-bg-swatch-custom");
+      if (!swatch) return;
+      const previewEntry = getSelectedBackgroundEntry() || customBackgrounds[0] || null;
+      if (selectedThemeBackground === "custom" && previewEntry) {
+        const bust = customBgDisplayUrl(previewEntry.url, previewBgCacheVersion);
+        if (bust) {
+          swatch.style.backgroundImage = `url("${bust}")`;
+          swatch.textContent = "";
+          return;
+        }
+      }
+      swatch.style.backgroundImage = "";
+      swatch.textContent = "+";
+    }
+
+    function updateBackgroundListChrome() {
+      const count = customBackgrounds.length;
+      const showHint = count > 1;
+      if (customBgSlideshowHint) {
+        customBgSlideshowHint.classList.toggle("hidden", !showHint);
+      }
+      if (customBackgroundUploadsPanel) {
+        customBackgroundUploadsPanel.classList.toggle("has-items", count > 0);
+      }
+      if (customBackgroundListEmpty) {
+        customBackgroundListEmpty.hidden = count > 0;
+      }
+      if (customBackgroundListCount) {
+        customBackgroundListCount.textContent = count > 0 ? `(${count})` : "";
+      }
+      if (clearCustomBackgroundBtn) {
+        clearCustomBackgroundBtn.hidden = count === 0;
+      }
+    }
+
+    function listImageSrcForEntry(entry) {
+      if (!entry?.url) return "";
+      if (entry.url.startsWith("blob:")) return entry.url;
+      return customBgDisplayUrl(entry.url, previewBgCacheVersion) || entry.url;
+    }
+
+    function renderCustomBackgroundList() {
+      if (!customBackgroundList) {
+        if (customBackgroundStatus) {
+          customBackgroundStatus.textContent = "Background list UI missing — refresh the page.";
+        }
+        return;
+      }
+      updateBackgroundListChrome();
+      customBackgroundList.replaceChildren();
+      const count = customBackgrounds.length;
+      if (!count) return;
+
+      if (!selectedBackgroundUrl && customBackgrounds[0]) {
+        selectedBackgroundUrl = customBackgrounds[0].url;
+        customBackgroundUrl = selectedBackgroundUrl;
+        syncLegacyTransformFromEntry(customBackgrounds[0]);
+      }
+
+      for (let index = 0; index < customBackgrounds.length; index += 1) {
+        const entry = customBackgrounds[index];
+        const isSelected = stripBackgroundUrlQuery(entry.url) === stripBackgroundUrlQuery(selectedBackgroundUrl);
+        const li = document.createElement("li");
+        li.className = `custom-bg-list-item${isSelected ? " is-selected" : ""}`;
+        li.dataset.url = entry.url;
+
+        const row = document.createElement("div");
+        row.className = "custom-bg-list-row";
+        row.setAttribute("role", "button");
+        row.tabIndex = 0;
+        row.dataset.selectUrl = entry.url;
+        row.setAttribute("aria-pressed", isSelected ? "true" : "false");
+
+        const thumb = document.createElement("span");
+        thumb.className = "custom-bg-list-thumb";
+        const img = document.createElement("img");
+        img.src = listImageSrcForEntry(entry);
+        img.alt = backgroundListLabel(entry, index);
+        thumb.appendChild(img);
+
+        const meta = document.createElement("div");
+        meta.className = "custom-bg-list-meta";
+        const title = document.createElement("strong");
+        title.textContent = backgroundListLabel(entry, index);
+        const hint = document.createElement("span");
+        hint.className = "custom-bg-list-preview-label";
+        hint.textContent = isSelected
+          ? "Shown in live preview — adjust below"
+          : "Click to preview & adjust in live view";
+        meta.appendChild(title);
+        meta.appendChild(hint);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "custom-bg-list-delete";
+        deleteBtn.dataset.url = entry.url;
+        deleteBtn.title = "Remove this background";
+        deleteBtn.textContent = "Delete";
+
+        row.appendChild(thumb);
+        row.appendChild(meta);
+        row.appendChild(deleteBtn);
+        li.append(row);
+        customBackgroundList.appendChild(li);
+      }
+    }
+
+    function schedulePersistCustomBackgrounds() {
+      if (bgAdjustPersistTimer) clearTimeout(bgAdjustPersistTimer);
+      bgAdjustPersistTimer = setTimeout(() => {
+        bgAdjustPersistTimer = null;
+        void persistThemeSelection();
+      }, 400);
+    }
+
+    async function removeCustomBackgroundByUrl(url) {
+      const target = stripBackgroundUrlQuery(url);
+      if (!target) return;
+      if (target.startsWith("blob:")) {
+        revokeOptimisticBackgroundUrl(target);
+        applyBackgroundEntries(customBackgrounds.filter((entry) => entry.url !== target));
+        renderCustomBackgroundList();
+        if (!customBackgrounds.length) {
+          selectedThemeBackground = DEFAULT_THEME_BACKGROUND;
+          applyGameTheme(FIXED_THEME_PATTERN, DEFAULT_THEME_BACKGROUND, null);
+        }
+        return;
+      }
+      if (customBackgroundStatus) customBackgroundStatus.textContent = "Removing image…";
+      try {
+        const res = await fetch(`/api/event-background?url=${encodeURIComponent(target)}`, {
+          method: "DELETE"
+        });
+        const data = await parseApiJson(res);
+        if (!res.ok) throw new Error(data.error || "Could not remove image.");
+        applyEventBranding(data);
+        if (customBackgroundStatus) customBackgroundStatus.textContent = "Image removed.";
+      } catch (err) {
+        if (customBackgroundStatus) {
+          customBackgroundStatus.textContent = err.message || "Could not remove image.";
+        }
+      }
+    }
+
+    customBackgroundList?.addEventListener("click", (event) => {
+      const deleteBtn = event.target.closest(".custom-bg-list-delete");
+      if (deleteBtn?.dataset.url) {
+        event.preventDefault();
+        event.stopPropagation();
+        void removeCustomBackgroundByUrl(deleteBtn.dataset.url);
+        return;
+      }
+      const row = event.target.closest("[data-select-url]");
+      if (row?.dataset.selectUrl) {
+        event.preventDefault();
+        setSelectedBackgroundUrl(row.dataset.selectUrl);
+      }
+    });
+
+    customBackgroundList?.addEventListener("keydown", (event) => {
+      const row = event.target.closest("[data-select-url]");
+      if (!row?.dataset.selectUrl) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        setSelectedBackgroundUrl(row.dataset.selectUrl);
+      }
+    });
 
     function clearCustomBgMesh(mesh) {
       if (!mesh) return;
@@ -781,10 +1249,15 @@
       mesh.style.removeProperty("background-color");
     }
 
-    function paintCustomBgMesh(mesh, bustUrl) {
+    function paintCustomBgMesh(mesh, bustUrl, entry) {
       if (!mesh || !bustUrl) return;
-      const pos = `${customBackgroundPosX}% ${customBackgroundPosY}%`;
-      const size = `${customBackgroundScale}% auto`;
+      const transform = entry || getSelectedBackgroundEntry() || {
+        posX: customBackgroundPosX,
+        posY: customBackgroundPosY,
+        scale: customBackgroundScale
+      };
+      const pos = `${transform.posX}% ${transform.posY}%`;
+      const size = `${transform.scale}% auto`;
       mesh.style.setProperty("background-color", "transparent", "important");
       mesh.style.setProperty("background-image", `url("${bustUrl}")`, "important");
       mesh.style.setProperty("background-position", pos, "important");
@@ -793,9 +1266,11 @@
     }
 
     function paintAllCustomBackgroundMeshes(cacheVersion) {
-      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      if (isAdSlideshowEligible()) return;
+      const previewEntry = getSelectedBackgroundEntry();
+      const isCustom = selectedThemeBackground === "custom" && !!previewEntry;
       const bustUrl = isCustom
-        ? customBgDisplayUrl(customBackgroundUrl, cacheVersion ?? previewBgCacheVersion)
+        ? customBgDisplayUrl(previewEntry.url, cacheVersion ?? previewBgCacheVersion)
         : null;
       const editingInDashboard = isSetupCustomizeView() && isCustom;
 
@@ -811,27 +1286,46 @@
       }
 
       if (!editingInDashboard) {
-        document.querySelectorAll("body > .bg-mesh").forEach((mesh) => paintCustomBgMesh(mesh, bustUrl));
+        const staticEntry = isAdSlideshowEligible()
+          ? getCustomBackgroundSlides()[0]
+          : previewEntry;
+        document.querySelectorAll("body > .bg-mesh").forEach((mesh) => {
+          paintCustomBgMesh(mesh, bustUrl, staticEntry);
+        });
       }
       applyPreviewBackgroundLayer(cacheVersion);
     }
 
-    function applyGameTheme(pattern, background, customUrl, cacheVersion) {
-      if (pattern) selectedThemePattern = pattern;
+    function applyGameTheme(_pattern, background, customUrl, cacheVersion) {
+      selectedThemePattern = FIXED_THEME_PATTERN;
       if (background) selectedThemeBackground = background;
 
       if (selectedThemeBackground === "custom") {
         if (customUrl !== undefined) {
-          customBackgroundUrl = stripBackgroundUrlQuery(customUrl);
+          const single = stripBackgroundUrlQuery(customUrl);
+          if (single && !customBackgrounds.some((entry) => entry.url === single)) {
+            customBackgrounds.unshift({
+              url: single,
+              posX: 50,
+              posY: 50,
+              scale: 100
+            });
+          }
+          customBackgroundUrls = customBackgrounds.map((entry) => entry.url);
+          customBackgroundUrl = selectedBackgroundUrl || customBackgroundUrls[0] || single || null;
+          if (!selectedBackgroundUrl) selectedBackgroundUrl = customBackgroundUrl;
         }
       } else {
         customBackgroundUrl = null;
+        customBackgroundUrls = [];
+        customBackgrounds = [];
+        selectedBackgroundUrl = null;
       }
 
-      const isCustom = selectedThemeBackground === "custom" && !!customBackgroundUrl;
+      const isCustom = selectedThemeBackground === "custom" && customBackgrounds.length > 0;
       const editingInDashboard = isSetupCustomizeView() && isCustom;
       const pageBg = editingInDashboard
-        ? (PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight")
+        ? DEFAULT_THEME_BACKGROUND
         : selectedThemeBackground;
 
       document.body.dataset.pattern = selectedThemePattern || "classic";
@@ -851,8 +1345,9 @@
       }
 
       if (isCustom) {
+        const previewEntry = getSelectedBackgroundEntry();
         const bustUrl = customBgDisplayUrl(
-          customBackgroundUrl,
+          previewEntry?.url || customBackgroundUrl,
           cacheVersion || previewBgCacheVersion
         );
         const urlValue = `url("${bustUrl}")`;
@@ -873,21 +1368,17 @@
       paintAllCustomBackgroundMeshes(cacheVersion || previewBgCacheVersion);
       fitSetupPreviewScale();
 
-      if (selectedPatternBadge && selectedThemePattern) {
-        const p = getThemePatterns().find((x) => x.id === selectedThemePattern);
-        selectedPatternBadge.textContent = p ? p.name : selectedThemePattern;
-      }
-
       applyCustomBackgroundTransform();
       syncThemePickerUi();
       updateClearBackgroundButton();
       updateCustomUploadSwatch();
+      renderCustomBackgroundList();
+      refreshAdBackgroundPlayback();
       if (isSetupCustomizeView()) refreshDashboardPreview();
     }
 
     function updateClearBackgroundButton() {
-      if (!clearCustomBackgroundBtn) return;
-      clearCustomBackgroundBtn.hidden = !customBackgroundUrl;
+      updateBackgroundListChrome();
     }
 
     async function parseApiJson(res) {
@@ -904,10 +1395,11 @@
     }
 
     async function clearCustomBackground() {
-      if (!customBackgroundUrl && selectedThemeBackground !== "custom") return;
-      const fallbackBg = PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight";
+      if (!customBackgrounds.length && selectedThemeBackground !== "custom") return;
+      const fallbackBg = DEFAULT_THEME_BACKGROUND;
       if (customBackgroundStatus) customBackgroundStatus.textContent = "Removing upload…";
       clearCustomBackgroundBtn.disabled = true;
+      clearOptimisticBackgroundUrls();
       try {
         let res = await fetch("/api/event-background/clear", { method: "POST" });
         let data = await parseApiJson(res);
@@ -926,7 +1418,7 @@
         }
 
         const nextBg = data.themeBackground || fallbackBg;
-        applyGameTheme(data.themePattern || selectedThemePattern, nextBg, null);
+        applyGameTheme(FIXED_THEME_PATTERN, nextBg, null);
         if (customBackgroundStatus) {
           customBackgroundStatus.textContent = "Upload removed — using preset background.";
         }
@@ -951,6 +1443,8 @@
           body: JSON.stringify({
             themePattern: selectedThemePattern,
             themeBackground: selectedThemeBackground,
+            circlesPanelTransparent,
+            rankingPanelTransparent,
             ...getBackgroundTransformPayload()
           })
         });
@@ -960,19 +1454,30 @@
     }
 
     function syncThemePickerUi() {
-      if (patternLaunchGrid) {
-        patternLaunchGrid.querySelectorAll(".pattern-launch-card").forEach((card) => {
-          const on = card.dataset.pattern === selectedThemePattern;
-          card.classList.toggle("is-selected", on);
-          card.setAttribute("aria-selected", on ? "true" : "false");
-        });
-      }
       if (backgroundPicker) {
         backgroundPicker.querySelectorAll(".theme-bg-card").forEach((card) => {
           const on = card.dataset.value === selectedThemeBackground;
           card.classList.toggle("is-selected", on);
           card.setAttribute("aria-selected", on ? "true" : "false");
         });
+      }
+    }
+
+    function syncPanelStyleAttributes() {
+      const circlesMode = circlesPanelTransparent ? "transparent" : "solid";
+      const rankingMode = rankingPanelTransparent ? "transparent" : "solid";
+      const targets = [
+        document.documentElement,
+        document.body,
+        setupPreviewScene,
+        setupLiveDemo,
+        lobbyView,
+        gameView
+      ];
+      for (const el of targets) {
+        if (!el) continue;
+        el.dataset.circlesPanel = circlesMode;
+        el.dataset.rankingPanel = rankingMode;
       }
     }
 
@@ -984,14 +1489,7 @@
         rankingPanelTransparent = !!branding.rankingPanelTransparent;
       }
 
-      const circlesMode = circlesPanelTransparent ? "transparent" : "solid";
-      const rankingMode = rankingPanelTransparent ? "transparent" : "solid";
-      document.body.dataset.circlesPanel = circlesMode;
-      document.body.dataset.rankingPanel = rankingMode;
-      if (setupLiveDemo) {
-        setupLiveDemo.dataset.circlesPanel = circlesMode;
-        setupLiveDemo.dataset.rankingPanel = rankingMode;
-      }
+      syncPanelStyleAttributes();
 
       if (circlesPanelTransparentInput) {
         circlesPanelTransparentInput.checked = circlesPanelTransparent;
@@ -1013,25 +1511,14 @@
       );
     }
 
-    function getThemePatterns() {
-      return Array.isArray(themeCatalog?.patterns) ? themeCatalog.patterns : [];
-    }
-
     function showSetupPhase(phase) {
       setupPhase = phase;
-      if (phase === "patterns") {
-        patternPickerPanel?.classList.remove("hidden");
-        eventCustomizePanel?.classList.add("hidden");
-        sponsorEditPanel?.classList.add("hidden");
-        sponsorLibraryPanel?.classList.remove("hidden");
-      } else if (phase === "customize") {
-        patternPickerPanel?.classList.add("hidden");
+      if (phase === "customize") {
         eventCustomizePanel?.classList.remove("hidden");
         sponsorEditPanel?.classList.add("hidden");
         sponsorLibraryPanel?.classList.remove("hidden");
         scheduleDashboardPreview();
       } else if (phase === "sponsor-edit") {
-        patternPickerPanel?.classList.add("hidden");
         eventCustomizePanel?.classList.add("hidden");
         showSponsorEditMode();
       }
@@ -1042,121 +1529,22 @@
       }
     }
 
-    function syncLayoutPatternSelect() {
-      if (!layoutPatternSelect) return;
-      layoutPatternSelect.value = selectedThemePattern || "classic";
-    }
-
-    function buildLayoutPatternSelect() {
-      if (!layoutPatternSelect) return;
-      const patterns = getThemePatterns();
-      const prev = layoutPatternSelect.value || selectedThemePattern || "classic";
-      layoutPatternSelect.innerHTML = "";
-      for (const pattern of patterns) {
-        const opt = document.createElement("option");
-        opt.value = pattern.id;
-        opt.textContent = pattern.name;
-        layoutPatternSelect.appendChild(opt);
-      }
-      if (!patterns.length) {
-        const opt = document.createElement("option");
-        opt.value = "classic";
-        opt.textContent = "Classic split";
-        layoutPatternSelect.appendChild(opt);
-      }
-      layoutPatternSelect.value = patterns.some((p) => p.id === prev) ? prev : "classic";
-    }
-
-    function openEventDashboard(patternId) {
+    function openEventDashboard() {
       hostPinnedView = "setup";
       setupView?.classList.remove("hidden");
       lobbyView?.classList.add("hidden");
       gameView?.classList.add("hidden");
-      const pid = patternId || selectedThemePattern || "classic";
       showSetupPhase("customize");
-      enterPattern(pid, { quiet: true });
+      const bg = selectedThemeBackground || DEFAULT_THEME_BACKGROUND;
+      const customUrl = bg === "custom" ? (customBackgroundUrl || undefined) : undefined;
+      applyGameTheme(FIXED_THEME_PATTERN, bg, customUrl);
       scheduleDashboardPreview();
     }
 
-    function enterPattern(patternId, options = {}) {
-      const patterns = getThemePatterns();
-      const pattern = patterns.find((p) => p.id === patternId)
-        || { id: patternId || "classic", name: patternId || "Classic split" };
-
-      selectedThemePattern = pattern.id;
-      showSetupPhase("customize");
-      syncThemePickerUi();
-      syncLayoutPatternSelect();
-
-      try {
-        const defaultBg = PATTERN_DEFAULT_BG[pattern.id] || "midnight";
-        const bg = selectedThemeBackground || defaultBg;
-        const customUrl = bg === "custom" ? customBackgroundUrl : undefined;
-        applyGameTheme(pattern.id, bg, customUrl);
-      } catch (err) {
-        console.error("enterPattern applyGameTheme failed", err);
-      }
-
-      if (!options.quiet) {
-        setupMessage.textContent = `Layout: ${pattern.name} — set title, background, and sponsor shapes below.`;
-        eventCustomizePanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-        eventTitleInput?.focus();
-      }
-      void persistThemeSelection();
-    }
-
-    function buildPatternLaunchGrid() {
-      const patterns = getThemePatterns();
-      if (!patternLaunchGrid) return;
-      if (!patterns.length) {
-        if (patternPickerHint) {
-          patternPickerHint.textContent = "Could not load layouts. Refresh the page or check that the server is running.";
-        }
-        return;
-      }
-
-      patternLaunchGrid.innerHTML = "";
-      for (const pattern of patterns) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `pattern-launch-card pattern-launch-${pattern.id}`;
-        btn.dataset.pattern = pattern.id;
-        btn.setAttribute("role", "option");
-        btn.innerHTML = `
-          <span class="pattern-launch-mock pattern-mock-${pattern.id}" aria-hidden="true">
-            <span class="mock-circle mock-left"></span>
-            <span class="mock-circle mock-right"></span>
-            <span class="mock-rank"></span>
-          </span>
-          <span class="pattern-launch-name">${escapeHtml(pattern.name)}</span>
-          <span class="pattern-launch-desc">${escapeHtml(pattern.description)}</span>
-          <span class="pattern-launch-cta">Customize this layout →</span>
-        `;
-        patternLaunchGrid.appendChild(btn);
-      }
-
-      if (patternPickerHint) {
-        patternPickerHint.textContent = "Click a layout to open the design screen.";
-      }
-
+    function initThemePicker() {
       buildBackgroundPicker();
-      buildLayoutPatternSelect();
       syncThemePickerUi();
-      syncLayoutPatternSelect();
     }
-
-    patternLaunchGrid?.addEventListener("click", (event) => {
-      const card = event.target.closest(".pattern-launch-card");
-      if (!card?.dataset.pattern) return;
-      event.preventDefault();
-      event.stopPropagation();
-      enterPattern(card.dataset.pattern);
-    });
-
-    layoutPatternSelect?.addEventListener("change", () => {
-      if (!layoutPatternSelect.value) return;
-      enterPattern(layoutPatternSelect.value);
-    });
 
     function buildBackgroundPicker() {
       const backgrounds = Array.isArray(themeCatalog?.backgrounds) ? themeCatalog.backgrounds : [];
@@ -1195,7 +1583,7 @@
       `;
       customBtn.title = "Use uploaded background image";
       customBtn.addEventListener("click", () => {
-        if (!customBackgroundUrl) {
+        if (!customBackgrounds.length) {
           customBackgroundInput?.click();
           return;
         }
@@ -1261,25 +1649,30 @@
       if (branding?.sponsorId) {
         selectedSponsorId = branding.sponsorId;
       }
-      setBackgroundTransform({
-        customBackgroundPosX: branding?.customBackgroundPosX,
-        customBackgroundPosY: branding?.customBackgroundPosY,
-        customBackgroundScale: branding?.customBackgroundScale
-      });
-      let bg = branding?.themeBackground;
-      const customUrl = bg === "custom" && branding?.customBackgroundUrl
-        ? branding.customBackgroundUrl
-        : null;
-      if (bg === "custom" && !customUrl) {
-        bg = PATTERN_DEFAULT_BG[branding?.themePattern] || "midnight";
+      syncCustomBackgroundsFromBranding(branding);
+      renderCustomBackgroundList();
+      let bg = branding?.themeBackground || selectedThemeBackground;
+      if (customBackgrounds.length) {
+        bg = "custom";
+      } else if (bg === "custom") {
+        bg = DEFAULT_THEME_BACKGROUND;
       }
-      applyGameTheme(
-        branding?.themePattern,
-        bg,
-        customUrl,
-        branding?.updatedAt || null
-      );
+      const customUrl = bg === "custom" && customBackgroundUrl
+        ? customBackgroundUrl
+        : null;
+      try {
+        applyGameTheme(
+          FIXED_THEME_PATTERN,
+          bg,
+          customUrl,
+          branding?.updatedAt || null
+        );
+      } catch (err) {
+        console.error("applyGameTheme failed", err);
+      }
+      renderCustomBackgroundList();
       applyPanelStyle(branding);
+      refreshAdBackgroundPlayback();
       const sponsorLabel = branding?.sponsorName
         ? `Shapes by ${branding.sponsorName}`
         : "";
@@ -1323,7 +1716,7 @@
         return;
       }
       if (setupPhase !== "customize") {
-        enterPattern(selectedThemePattern || "classic");
+        showSetupPhase("customize");
       }
       setupMessage.textContent = `${sponsor.name} selected — finish title & background, then continue to the lobby.`;
     }
@@ -1361,7 +1754,6 @@
     }
 
     function showSponsorEditMode() {
-      patternPickerPanel?.classList.add("hidden");
       eventCustomizePanel?.classList.add("hidden");
       sponsorLibraryPanel.classList.add("hidden");
       sponsorEditPanel.classList.remove("hidden");
@@ -1642,66 +2034,75 @@
       openSponsorEdit(sponsor.id, sponsor.name);
     });
 
-    backToPatternsBtn?.addEventListener("click", () => {
-      showSetupPhase("patterns");
-      setupMessage.textContent = "Pick a layout, or use the Screen layout menu on the design page.";
-      patternLaunchGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-
     clearCustomBackgroundBtn?.addEventListener("click", () => {
       void clearCustomBackground();
     });
 
-    function onBgAdjustInput() {
-      setBackgroundTransform({
-        customBackgroundPosX: bgPosXInput?.value,
-        customBackgroundPosY: bgPosYInput?.value,
-        customBackgroundScale: bgScaleInput?.value
-      }, { persist: true });
-      refreshDashboardBackground();
-    }
-
-    bgPosXInput?.addEventListener("input", onBgAdjustInput);
-    bgPosYInput?.addEventListener("input", onBgAdjustInput);
-    bgScaleInput?.addEventListener("input", onBgAdjustInput);
-
-    resetBgAdjustBtn?.addEventListener("click", () => {
-      setBackgroundTransform({
-        customBackgroundPosX: 50,
-        customBackgroundPosY: 50,
-        customBackgroundScale: 100
-      }, { persist: true });
-    });
-
     customBackgroundInput?.addEventListener("change", async () => {
-      const file = customBackgroundInput.files?.[0];
-      if (!file) return;
-      const form = new FormData();
-      form.append("background", file);
-      if (customBackgroundStatus) customBackgroundStatus.textContent = "Uploading background…";
+      const files = Array.from(customBackgroundInput.files || []);
+      if (!files.length) return;
+      if (customBackgroundStatus) {
+        customBackgroundStatus.textContent = `Uploading ${files.length} image${files.length > 1 ? "s" : ""}…`;
+      }
+      let lastData = null;
+      const optimisticBlobs = [];
       try {
-        const res = await fetch("/api/event-background", { method: "POST", body: form });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Upload failed");
-        selectedThemeBackground = "custom";
-        customBackgroundUrl = stripBackgroundUrlQuery(data.customBackgroundUrl);
-        previewBgCacheVersion = data.updatedAt || null;
-        applyGameTheme(
-          data.themePattern || selectedThemePattern,
-          "custom",
-          data.customBackgroundUrl,
-          data.updatedAt || null
-        );
-        applyEventBranding(data);
-        if (customBackgroundStatus) {
-          customBackgroundStatus.textContent = "Custom background applied — use the sliders below if it looks too small or off-center.";
+        for (let i = 0; i < files.length; i += 1) {
+          optimisticBlobs.push(addOptimisticBackgroundFromFile(files[i]));
+          renderCustomBackgroundList();
+          customBackgroundUploadsPanel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+          const form = new FormData();
+          form.append("background", files[i]);
+          const res = await fetch("/api/event-background", { method: "POST", body: form });
+          const data = await parseApiJson(res);
+          if (!res.ok) throw new Error(data.error || "Upload failed");
+          if (!uploadResponseLooksValid(data)) {
+            throw new Error(
+              serverSupportsMultiBg === false
+                ? staleServerUploadMessage()
+                : "Upload did not return saved backgrounds — restart the server and try again."
+            );
+          }
+          lastData = data;
+          selectedThemeBackground = "custom";
+          addBackgroundFromUploadResponse(data);
+          renderCustomBackgroundList();
+          if (customBackgroundStatus && files.length > 1) {
+            customBackgroundStatus.textContent = `Uploaded ${i + 1} of ${files.length}…`;
+          }
         }
-        updateClearBackgroundButton();
-        syncThemePickerUi();
-        scheduleDashboardPreview();
-        setupLiveDemo?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        if (!lastData) return;
+        previewBgCacheVersion = lastData.updatedAt || null;
+        selectedThemeBackground = "custom";
+        if (!addBackgroundFromUploadResponse(lastData)) {
+          throw new Error(staleServerUploadMessage());
+        }
+        try {
+          applyGameTheme(FIXED_THEME_PATTERN, "custom", undefined, previewBgCacheVersion);
+        } catch (themeErr) {
+          console.error("applyGameTheme after upload failed", themeErr);
+        }
+        const newest = customBackgrounds[customBackgrounds.length - 1];
+        if (newest?.url) {
+          setSelectedBackgroundUrl(newest.url, { scrollIntoView: false });
+        } else {
+          renderCustomBackgroundList();
+          updateCustomBackgroundAdjustPanel();
+        }
+        if (customBackgroundStatus) {
+          const count = customBackgrounds.length;
+          customBackgroundStatus.textContent = count > 1
+            ? `${count} advertising backgrounds saved — click each to preview and adjust in the live view.`
+            : "Background saved — adjust position and zoom in the live preview below.";
+        }
       } catch (err) {
+        removeOptimisticBackgroundEntries();
+        renderCustomBackgroundList();
         if (customBackgroundStatus) customBackgroundStatus.textContent = err.message || "Could not upload.";
+      }
+      for (const blobUrl of optimisticBlobs) {
+        revokeOptimisticBackgroundUrl(blobUrl);
       }
       customBackgroundInput.value = "";
     });
@@ -1808,6 +2209,8 @@
         themePattern: selectedThemePattern,
         themeBackground: selectedThemeBackground,
         customBackgroundUrl,
+        customBackgroundUrls,
+        customBackgrounds,
         circlesPanelTransparent,
         rankingPanelTransparent
       });
@@ -1816,12 +2219,16 @@
 
     circlesPanelTransparentInput?.addEventListener("change", () => {
       circlesPanelTransparent = circlesPanelTransparentInput.checked;
+      syncPanelStyleAttributes();
       updateSetupPreview();
+      void persistThemeSelection();
     });
 
     rankingPanelTransparentInput?.addEventListener("change", () => {
       rankingPanelTransparent = rankingPanelTransparentInput.checked;
+      syncPanelStyleAttributes();
       updateSetupPreview();
+      void persistThemeSelection();
     });
 
     function showSetupView() {
@@ -1830,6 +2237,7 @@
       lobbyView.classList.add("hidden");
       gameView.classList.add("hidden");
       showSetupPhase("customize");
+      refreshAdBackgroundPlayback();
     }
 
     function showLobbyView() {
@@ -1837,16 +2245,18 @@
       setupView.classList.add("hidden");
       lobbyView.classList.remove("hidden");
       gameView.classList.add("hidden");
+      syncPanelStyleAttributes();
       renderLobbyPlayers(latestLeaderboard);
       let lobbyBg = selectedThemeBackground;
-      if (lobbyBg === "custom" && !customBackgroundUrl) {
-        lobbyBg = PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight";
+      if (lobbyBg === "custom" && !customBackgrounds.length) {
+        lobbyBg = DEFAULT_THEME_BACKGROUND;
       }
       applyGameTheme(
-        selectedThemePattern,
+        FIXED_THEME_PATTERN,
         lobbyBg,
         lobbyBg === "custom" ? customBackgroundUrl : null
       );
+      refreshAdBackgroundPlayback();
     }
 
     function showGameView() {
@@ -1854,6 +2264,8 @@
       setupView.classList.add("hidden");
       lobbyView.classList.add("hidden");
       gameView.classList.remove("hidden");
+      syncPanelStyleAttributes();
+      refreshAdBackgroundPlayback();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (lastGameCircleShapes.left.length || lastGameCircleShapes.right.length) {
@@ -1896,7 +2308,7 @@
       eventTitleInput.value = currentEventTitle;
       showSetupView();
       updateSetupPreview();
-      setupMessage.textContent = "Players were cleared — pick your layout and design again, then continue to the lobby.";
+      setupMessage.textContent = "Players were cleared — design your screen again, then continue to the lobby.";
       loadSponsorCatalog().catch(() => {});
     });
 
@@ -1905,10 +2317,6 @@
       hostPinnedView = null;
 
       const title = eventTitleInput.value.trim();
-      if (!selectedThemePattern) {
-        enterPattern("classic", { quiet: true });
-      }
-
       if (!title) {
         setupMessage.textContent = "Please enter an event title.";
         eventTitleInput.focus();
@@ -1947,8 +2355,8 @@
       try {
         socket.emit("hostResetGame");
         let themeBg = selectedThemeBackground;
-        if (themeBg === "custom" && !customBackgroundUrl) {
-          themeBg = PATTERN_DEFAULT_BG[selectedThemePattern] || "midnight";
+        if (themeBg === "custom" && !customBackgrounds.length) {
+          themeBg = DEFAULT_THEME_BACKGROUND;
         }
 
         const res = await fetch("/api/event-branding", {
@@ -1960,6 +2368,8 @@
             themePattern: selectedThemePattern,
             themeBackground: themeBg,
             customBackgroundUrl: themeBg === "custom" ? customBackgroundUrl : null,
+            customBackgroundUrls: themeBg === "custom" ? customBackgroundUrls : [],
+            customBackgrounds: themeBg === "custom" ? customBackgrounds : [],
             ...getBackgroundTransformPayload(),
             circlesPanelTransparent,
             rankingPanelTransparent
@@ -1998,26 +2408,34 @@
     ])
       .then(([themesData, branding]) => {
         themeCatalog = {
-          patterns: Array.isArray(themesData?.patterns) ? themesData.patterns : [],
           backgrounds: Array.isArray(themesData?.backgrounds) ? themesData.backgrounds : [],
           presets: Array.isArray(themesData?.presets) ? themesData.presets : []
         };
-        buildPatternLaunchGrid();
+        initThemePicker();
         applyEventBranding(branding);
         if (canOpenLobby(branding)) {
           showLobbyView();
         } else {
-          openEventDashboard(branding?.themePattern || "classic");
+          openEventDashboard();
         }
       })
       .catch(() => {
-        themeCatalog = { patterns: [], backgrounds: [], presets: [] };
-        buildPatternLaunchGrid();
-        openEventDashboard("classic");
-        if (patternPickerHint) {
-          patternPickerHint.textContent = "Could not reach the server. Start it with npm start, then refresh.";
-        }
+        themeCatalog = { backgrounds: [], presets: [] };
+        initThemePicker();
+        openEventDashboard();
         setupMessage.textContent = "Server offline — start with npm start, then refresh. You can still edit the form below.";
+      });
+
+    fetch("/health")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((health) => {
+        serverSupportsMultiBg = health?.features?.multiCustomBackgrounds === true;
+        if (serverSupportsMultiBg === false && customBackgroundStatus) {
+          customBackgroundStatus.textContent = staleServerUploadMessage();
+        }
+      })
+      .catch(() => {
+        serverSupportsMultiBg = null;
       });
 
     fetch("/api/join-info")

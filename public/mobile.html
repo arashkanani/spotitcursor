@@ -55,6 +55,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/player-ui.js"></script>
+  <script src="/ad-background-slideshow.js"></script>
   <script>
     const socket = io({ transports: ["websocket", "polling"] });
 
@@ -76,29 +77,101 @@
     const MISTAKES_PER_ROUND = 3;
     const PLAYER_TOKEN_KEY = "spotit_player_token";
 
-    function applyMobileTheme(branding) {
-      let bg = branding?.themeBackground || "midnight";
-      const rawUrl = branding?.customBackgroundUrl || null;
-      if (bg === "custom" && !rawUrl) bg = "midnight";
-      document.body.dataset.bg = bg;
-      document.body.dataset.pattern = branding?.themePattern || "classic";
-      if (bg === "custom" && rawUrl) {
-        const base = String(rawUrl).split("?")[0];
-        const v = branding?.updatedAt
-          ? new Date(branding.updatedAt).getTime()
-          : Date.now();
+    let latestMobileBranding = null;
+
+    function resolveMobileAssetUrl(path) {
+      if (!path) return null;
+      const raw = String(path).split("?")[0].trim();
+      if (/^https?:\/\//i.test(raw)) return raw;
+      const base = raw.startsWith("/") ? raw : `/${raw}`;
+      return `${window.location.origin}${base}`;
+    }
+
+    function getMobileBackgroundSlides(branding) {
+      const entries = [];
+      if (Array.isArray(branding?.customBackgrounds)) {
+        for (const item of branding.customBackgrounds) {
+          const base = String(item?.url || "").split("?")[0].trim();
+          if (!base || entries.some((entry) => entry.url === base)) continue;
+          entries.push({
+            url: base,
+            posX: Math.min(150, Math.max(-50, Number(item.posX) || 50)),
+            posY: Math.min(150, Math.max(-50, Number(item.posY) || 50)),
+            scale: Math.min(500, Math.max(25, Number(item.scale) || 100))
+          });
+        }
+      }
+      if (!entries.length) {
+        const urls = [];
+        if (Array.isArray(branding?.customBackgroundUrls)) {
+          for (const entry of branding.customBackgroundUrls) {
+            const base = String(entry || "").split("?")[0].trim();
+            if (base) urls.push(base);
+          }
+        }
+        if (!urls.length && branding?.customBackgroundUrl) {
+          urls.push(String(branding.customBackgroundUrl).split("?")[0].trim());
+        }
         const posX = Math.min(150, Math.max(-50, Number(branding?.customBackgroundPosX) || 50));
         const posY = Math.min(150, Math.max(-50, Number(branding?.customBackgroundPosY) || 50));
         const scale = Math.min(500, Math.max(25, Number(branding?.customBackgroundScale) || 100));
-        const bust = `${base}?v=${v}`;
-        document.body.style.setProperty("--custom-bg-url", `url("${bust}")`);
+        for (const base of urls) {
+          entries.push({ url: base, posX, posY, scale });
+        }
+      }
+      const v = branding?.updatedAt
+        ? new Date(branding.updatedAt).getTime()
+        : Date.now();
+      return entries.map((entry) => {
+        const resolved = resolveMobileAssetUrl(entry.url);
+        if (!resolved) return null;
+        return {
+          url: `${resolved}?v=${v}`,
+          posX: entry.posX,
+          posY: entry.posY,
+          scale: entry.scale
+        };
+      }).filter(Boolean);
+    }
+
+    function isMobileGameScreenActive() {
+      return joined && gameCard && !gameCard.classList.contains("hidden");
+    }
+
+    function refreshMobileAdPlayback() {
+      if (typeof AdBackgroundSlideshow === "undefined") return;
+      const branding = latestMobileBranding;
+      let bg = branding?.themeBackground || "midnight";
+      const slides = getMobileBackgroundSlides(branding);
+      if (bg === "custom" && !slides.length) bg = "midnight";
+      const running = bg === "custom"
+        && slides.length > 1
+        && isMobileGameScreenActive();
+      AdBackgroundSlideshow.update({
+        slides: running ? slides : [],
+        running
+      });
+      if (!running) {
+        paintMobileStaticBackground(branding, bg, slides[0] || null);
+      }
+    }
+
+    function paintMobileStaticBackground(branding, bg, slide) {
+      document.body.dataset.bg = bg;
+      document.body.dataset.pattern = branding?.themePattern || "classic";
+      const mesh = document.querySelector("body > .bg-mesh");
+      if (bg === "custom" && slide?.url) {
+        const posX = slide.posX ?? 50;
+        const posY = slide.posY ?? 50;
+        const scale = slide.scale ?? 100;
+        const bustUrl = slide.url;
+        document.body.style.setProperty("--custom-bg-url", `url("${bustUrl}")`);
         document.body.style.setProperty("--custom-bg-pos-x", `${posX}%`);
         document.body.style.setProperty("--custom-bg-pos-y", `${posY}%`);
         document.body.style.setProperty("--custom-bg-size", `${scale}% auto`);
-        const mesh = document.querySelector("body > .bg-mesh");
         if (mesh) {
           mesh.style.backgroundColor = "transparent";
-          mesh.style.backgroundImage = `url("${bust}")`;
+          mesh.style.backgroundImage = `url("${bustUrl}")`;
           mesh.style.backgroundPosition = `${posX}% ${posY}%`;
           mesh.style.backgroundSize = `${scale}% auto`;
           mesh.style.backgroundRepeat = "no-repeat";
@@ -108,7 +181,6 @@
         document.body.style.removeProperty("--custom-bg-pos-x");
         document.body.style.removeProperty("--custom-bg-pos-y");
         document.body.style.removeProperty("--custom-bg-size");
-        const mesh = document.querySelector("body > .bg-mesh");
         if (mesh) {
           mesh.style.removeProperty("background");
           mesh.style.removeProperty("background-image");
@@ -118,6 +190,11 @@
           mesh.style.removeProperty("background-color");
         }
       }
+    }
+
+    function applyMobileTheme(branding) {
+      latestMobileBranding = branding;
+      refreshMobileAdPlayback();
     }
     let joined = false;
     let myProfile = null;
@@ -351,6 +428,7 @@
       joinBtn.disabled = true;
       updateJoinButtonState();
       joinMessage.textContent = message || "Scan the QR code on the host screen to join.";
+      refreshMobileAdPlayback();
     }
 
     socket.on("sessionReset", (data) => {
@@ -377,6 +455,7 @@
       mobileStatus.textContent = "Joined. Waiting for host to start...";
       joinBtn.disabled = false;
       updateJoinButtonState();
+      refreshMobileAdPlayback();
     });
 
     socket.on("pickResult", (data) => {

@@ -44,14 +44,29 @@ const { DATA_DIR } = require("./lib/config");
 const BACKGROUNDS_DIR = path.join(DATA_DIR, "backgrounds");
 fs.mkdirSync(BACKGROUNDS_DIR, { recursive: true });
 
+function backgroundFileExists(url) {
+  const filename = eventBrandingStore.backgroundFilenameFromUrl(url);
+  if (!filename) return false;
+  return fs.existsSync(path.join(BACKGROUNDS_DIR, filename));
+}
+
 function repairEventConfig(config) {
   const next = { ...config };
   let changed = false;
-  const customUrl = String(next.customBackgroundUrl || "").trim();
 
-  if (next.themeBackground === "custom" && customUrl) {
-    const filePath = path.join(BACKGROUNDS_DIR, path.basename(eventBrandingStore.stripBackgroundUrlQuery(customUrl)));
-    if (!fs.existsSync(filePath)) {
+  if (next.themeBackground === "custom") {
+    const backgrounds = eventBrandingStore.normalizeCustomBackgrounds(next);
+    const existing = backgrounds.filter((entry) => backgroundFileExists(entry.url));
+    if (existing.length !== backgrounds.length) {
+      next.customBackgrounds = existing;
+      next.customBackgroundUrls = existing.map((entry) => entry.url);
+      next.customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(existing);
+      Object.assign(next, eventBrandingStore.primaryBackgroundTransform(existing));
+      changed = true;
+    }
+    if (!existing.length) {
+      next.customBackgrounds = [];
+      next.customBackgroundUrls = [];
       next.customBackgroundUrl = null;
       next.themeBackground = themes.defaultBackgroundForPattern(next.themePattern);
       changed = true;
@@ -65,9 +80,15 @@ function repairEventConfig(config) {
     changed = true;
   }
 
-  if (theme.themeBackground !== "custom" && next.customBackgroundUrl) {
-    next.customBackgroundUrl = null;
-    changed = true;
+  if (theme.themeBackground !== "custom") {
+    if (next.customBackgroundUrl
+      || (next.customBackgroundUrls && next.customBackgroundUrls.length)
+      || (next.customBackgrounds && next.customBackgrounds.length)) {
+      next.customBackgroundUrl = null;
+      next.customBackgroundUrls = [];
+      next.customBackgrounds = [];
+      changed = true;
+    }
   }
 
   return changed ? eventBrandingStore.writeEventConfig(next) : next;
@@ -75,12 +96,19 @@ function repairEventConfig(config) {
 
 let eventConfig = repairEventConfig(eventBrandingStore.readEventConfig());
 
+function newBackgroundFilename(originalName) {
+  const ext = path.extname(originalName).toLowerCase();
+  const safeExt = ext === ".png" || ext === ".webp" || ext === ".jpg" || ext === ".jpeg"
+    ? ext
+    : ".jpg";
+  return `bg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}${safeExt}`;
+}
+
 const backgroundUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, BACKGROUNDS_DIR),
     filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `event-background${ext === ".png" || ext === ".webp" || ext === ".jpg" || ext === ".jpeg" ? ext : ".jpg"}`);
+      cb(null, newBackgroundFilename(file.originalname));
     }
   }),
   limits: { fileSize: 8 * 1024 * 1024 },
@@ -227,6 +255,7 @@ function getEventPayload() {
     ? sponsors.getSponsorById(eventConfig.sponsorId)
     : null;
   const theme = themes.normalizeTheme(eventConfig);
+  const storedBackgrounds = eventBrandingStore.normalizeCustomBackgrounds(eventConfig);
   return {
     title: eventConfig.title,
     sponsorId: eventConfig.sponsorId,
@@ -236,12 +265,24 @@ function getEventPayload() {
     themePattern: theme.themePattern,
     themeBackground: theme.themeBackground,
     customBackgroundUrl:
-      theme.themeBackground === "custom"
+      theme.themeBackground === "custom" && storedBackgrounds.length
         ? eventBrandingStore.withBackgroundCacheBuster(
           eventConfig.customBackgroundUrl,
           eventConfig.updatedAt
         )
         : null,
+    customBackgroundUrls: storedBackgrounds.length
+      ? eventBrandingStore.withBackgroundUrlsCacheBuster(
+        storedBackgrounds.map((entry) => entry.url),
+        eventConfig.updatedAt
+      )
+      : [],
+    customBackgrounds: storedBackgrounds.length
+      ? eventBrandingStore.withCustomBackgroundsCacheBuster(
+        storedBackgrounds,
+        eventConfig.updatedAt
+      )
+      : [],
     updatedAt: eventConfig.updatedAt || null,
     customBackgroundPosX: eventConfig.customBackgroundPosX ?? eventBrandingStore.DEFAULT_BG_POS,
     customBackgroundPosY: eventConfig.customBackgroundPosY ?? eventBrandingStore.DEFAULT_BG_POS,
@@ -428,7 +469,10 @@ app.get("/health", (_req, res) => {
     ok: true,
     players: players.size,
     maxPlayers: MAX_PLAYERS,
-    uptime: Math.floor(process.uptime())
+    uptime: Math.floor(process.uptime()),
+    features: {
+      multiCustomBackgrounds: true
+    }
   });
 });
 
@@ -456,18 +500,50 @@ app.get("/api/event-branding", (_req, res) => {
   res.json(getEventPayload());
 });
 
-function clearStoredCustomBackgroundFiles(keepFilename) {
+function isStoredBackgroundFile(file) {
+  return /^bg-[\w-]+\.(png|jpe?g|webp)$/i.test(file)
+    || /^event-background\.(png|jpe?g|webp)$/i.test(file);
+}
+
+function clearStoredCustomBackgroundFiles(keepFilenames = []) {
   if (!fs.existsSync(BACKGROUNDS_DIR)) return;
+  const keep = new Set(Array.isArray(keepFilenames) ? keepFilenames : [keepFilenames].filter(Boolean));
   for (const file of fs.readdirSync(BACKGROUNDS_DIR)) {
-    if (/^event-background\.(png|jpe?g|webp)$/i.test(file)) {
-      if (keepFilename && file === keepFilename) continue;
-      try {
-        fs.unlinkSync(path.join(BACKGROUNDS_DIR, file));
-      } catch (_error) {
-        // Ignore delete errors.
-      }
+    if (!isStoredBackgroundFile(file)) continue;
+    if (keep.has(file)) continue;
+    try {
+      fs.unlinkSync(path.join(BACKGROUNDS_DIR, file));
+    } catch (_error) {
+      // Ignore delete errors.
     }
   }
+}
+
+function deleteStoredBackgroundFile(url) {
+  const filename = eventBrandingStore.backgroundFilenameFromUrl(url);
+  if (!filename) return false;
+  const filePath = path.join(BACKGROUNDS_DIR, filename);
+  if (!fs.existsSync(filePath)) return false;
+  fs.unlinkSync(filePath);
+  return true;
+}
+
+function appendCustomBackgroundUrl(url) {
+  const backgrounds = eventBrandingStore.normalizeCustomBackgrounds(eventConfig);
+  if (backgrounds.length >= eventBrandingStore.MAX_CUSTOM_BACKGROUNDS) {
+    throw new Error(`You can upload up to ${eventBrandingStore.MAX_CUSTOM_BACKGROUNDS} advertising backgrounds.`);
+  }
+  if (!backgrounds.some((entry) => entry.url === url)) {
+    const entry = eventBrandingStore.normalizeBackgroundEntry({ url }, eventConfig);
+    if (entry) backgrounds.push(entry);
+  }
+  return eventBrandingStore.writeEventConfig({
+    ...eventConfig,
+    themeBackground: "custom",
+    customBackgrounds: backgrounds,
+    customBackgroundUrls: backgrounds.map((entry) => entry.url),
+    customBackgroundUrl: url
+  });
 }
 
 app.patch("/api/event-branding/theme", (req, res) => {
@@ -484,15 +560,49 @@ app.patch("/api/event-branding/theme", (req, res) => {
   } else if (background && themes.isValidBackground(background) && background !== "custom") {
     eventConfig.themeBackground = background;
     eventConfig.customBackgroundUrl = null;
+    eventConfig.customBackgroundUrls = [];
+    eventConfig.customBackgrounds = [];
     clearStoredCustomBackgroundFiles();
   }
 
-  if (req.body?.customBackgroundPosX !== undefined
+  if (Array.isArray(req.body?.customBackgrounds)) {
+    eventConfig.customBackgrounds = eventBrandingStore.normalizeCustomBackgrounds({
+      ...eventConfig,
+      customBackgrounds: req.body.customBackgrounds
+    });
+    eventConfig.customBackgroundUrls = eventConfig.customBackgrounds.map((entry) => entry.url);
+    eventConfig.customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(eventConfig.customBackgrounds);
+    Object.assign(eventConfig, eventBrandingStore.primaryBackgroundTransform(eventConfig.customBackgrounds));
+  } else if (req.body?.customBackgroundPosX !== undefined
     || req.body?.customBackgroundPosY !== undefined
     || req.body?.customBackgroundScale !== undefined) {
-    eventConfig.customBackgroundPosX = bgTransform.customBackgroundPosX;
-    eventConfig.customBackgroundPosY = bgTransform.customBackgroundPosY;
-    eventConfig.customBackgroundScale = bgTransform.customBackgroundScale;
+    const targetUrl = eventBrandingStore.stripBackgroundUrlQuery(
+      req.body?.url || eventConfig.customBackgroundUrl
+    );
+    if (targetUrl) {
+      const updated = eventBrandingStore.updateBackgroundEntry(eventConfig, targetUrl, {
+        posX: req.body.customBackgroundPosX,
+        posY: req.body.customBackgroundPosY,
+        scale: req.body.customBackgroundScale
+      });
+      if (updated) {
+        eventConfig.customBackgrounds = updated;
+        eventConfig.customBackgroundUrls = updated.map((entry) => entry.url);
+        eventConfig.customBackgroundUrl = updated[0]?.url || null;
+        Object.assign(eventConfig, eventBrandingStore.primaryBackgroundTransform(updated));
+      }
+    } else {
+      eventConfig.customBackgroundPosX = bgTransform.customBackgroundPosX;
+      eventConfig.customBackgroundPosY = bgTransform.customBackgroundPosY;
+      eventConfig.customBackgroundScale = bgTransform.customBackgroundScale;
+    }
+  }
+
+  if (req.body?.circlesPanelTransparent !== undefined) {
+    eventConfig.circlesPanelTransparent = !!req.body.circlesPanelTransparent;
+  }
+  if (req.body?.rankingPanelTransparent !== undefined) {
+    eventConfig.rankingPanelTransparent = !!req.body.rankingPanelTransparent;
   }
 
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
@@ -504,6 +614,8 @@ app.patch("/api/event-branding/theme", (req, res) => {
 function handleClearCustomBackground(_req, res) {
   clearStoredCustomBackgroundFiles();
   eventConfig.customBackgroundUrl = null;
+  eventConfig.customBackgroundUrls = [];
+  eventConfig.customBackgrounds = [];
   if (eventConfig.themeBackground === "custom") {
     eventConfig.themeBackground = themes.defaultBackgroundForPattern(eventConfig.themePattern);
   }
@@ -513,8 +625,47 @@ function handleClearCustomBackground(_req, res) {
   res.json(payload);
 }
 
+function handleDeleteCustomBackground(req, res) {
+  const rawUrl = String(req.query?.url || req.body?.url || "").trim();
+  if (!rawUrl) {
+    res.status(400).json({ error: "Background url is required." });
+    return;
+  }
+  const target = eventBrandingStore.stripBackgroundUrlQuery(rawUrl);
+  const backgrounds = eventBrandingStore.normalizeCustomBackgrounds(eventConfig);
+  if (!backgrounds.some((entry) => entry.url === target)) {
+    res.status(404).json({ error: "Background not found." });
+    return;
+  }
+  deleteStoredBackgroundFile(target);
+  const remaining = backgrounds.filter((entry) => entry.url !== target);
+  if (!remaining.length) {
+    eventConfig.customBackgroundUrl = null;
+    eventConfig.customBackgroundUrls = [];
+    eventConfig.customBackgrounds = [];
+    if (eventConfig.themeBackground === "custom") {
+      eventConfig.themeBackground = themes.defaultBackgroundForPattern(eventConfig.themePattern);
+    }
+  } else {
+    eventConfig.customBackgrounds = remaining;
+    eventConfig.customBackgroundUrls = remaining.map((entry) => entry.url);
+    eventConfig.customBackgroundUrl = remaining[0].url;
+    Object.assign(eventConfig, eventBrandingStore.primaryBackgroundTransform(remaining));
+  }
+  eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
+  const payload = getEventPayload();
+  io.emit("eventBranding", payload);
+  res.json(payload);
+}
+
 app.post("/api/event-background/clear", handleClearCustomBackground);
-app.delete("/api/event-background", handleClearCustomBackground);
+app.delete("/api/event-background", (req, res) => {
+  if (req.query?.url || req.body?.url) {
+    handleDeleteCustomBackground(req, res);
+    return;
+  }
+  handleClearCustomBackground(req, res);
+});
 
 app.post("/api/event-background", backgroundUpload.single("background"), (req, res) => {
   try {
@@ -522,14 +673,8 @@ app.post("/api/event-background", backgroundUpload.single("background"), (req, r
       res.status(400).json({ error: "Upload a JPG, PNG, or WebP image." });
       return;
     }
-    clearStoredCustomBackgroundFiles(req.file.filename);
-    const ext = path.extname(req.file.filename).toLowerCase() || ".jpg";
-    const url = `/event-backgrounds/event-background${ext}`;
-    eventConfig = eventBrandingStore.writeEventConfig({
-      ...eventConfig,
-      customBackgroundUrl: url,
-      themeBackground: "custom"
-    });
+    const url = `/event-backgrounds/${req.file.filename}`;
+    eventConfig = appendCustomBackgroundUrl(url);
     const payload = getEventPayload();
     io.emit("eventBranding", payload);
     res.json(payload);
@@ -541,15 +686,29 @@ app.post("/api/event-background", backgroundUpload.single("background"), (req, r
 app.put("/api/event-branding", (req, res) => {
   const title = String(req.body?.title || "").trim().slice(0, 80);
   const sponsorId = String(req.body?.sponsorId || "").trim();
+  const incomingUrls = Array.isArray(req.body?.customBackgroundUrls)
+    ? req.body.customBackgroundUrls
+    : null;
   const incomingCustomUrl = req.body?.customBackgroundUrl || null;
   const theme = themes.normalizeTheme({
     themePattern: req.body?.themePattern,
     themeBackground: req.body?.themeBackground,
-    customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl
+    customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl,
+    customBackgroundUrls: incomingUrls || eventConfig.customBackgroundUrls
   });
-  const customBackgroundUrl = theme.themeBackground === "custom"
-    ? (incomingCustomUrl || eventConfig.customBackgroundUrl)
+  const incomingBackgrounds = Array.isArray(req.body?.customBackgrounds)
+    ? req.body.customBackgrounds
     : null;
+  const customBackgrounds = theme.themeBackground === "custom"
+    ? eventBrandingStore.normalizeCustomBackgrounds({
+      ...eventConfig,
+      customBackgrounds: incomingBackgrounds || eventConfig.customBackgrounds,
+      customBackgroundUrls: incomingUrls || eventConfig.customBackgroundUrls,
+      customBackgroundUrl: incomingCustomUrl || eventConfig.customBackgroundUrl
+    })
+    : [];
+  const customBackgroundUrls = customBackgrounds.map((entry) => entry.url);
+  const customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(customBackgrounds);
 
   if (!title) {
     res.status(400).json({ error: "Event title is required." });
@@ -589,7 +748,9 @@ app.put("/api/event-branding", (req, res) => {
     themePattern: theme.themePattern,
     themeBackground: theme.themeBackground,
     customBackgroundUrl,
-    ...bgTransform,
+    customBackgroundUrls,
+    customBackgrounds,
+    ...eventBrandingStore.primaryBackgroundTransform(customBackgrounds),
     circlesPanelTransparent: !!req.body?.circlesPanelTransparent,
     rankingPanelTransparent: !!req.body?.rankingPanelTransparent
   });
