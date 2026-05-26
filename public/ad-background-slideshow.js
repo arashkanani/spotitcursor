@@ -37,10 +37,19 @@
       this.running = false;
     }
 
+    clearLayer(layer) {
+      if (!layer) return;
+      layer.style.backgroundColor = "transparent";
+      layer.style.backgroundImage = "";
+      layer.style.backgroundPosition = "";
+      layer.style.backgroundSize = "";
+      layer.style.backgroundRepeat = "";
+    }
+
     paintLayer(layer, slide) {
       const item = normalizeSlide(slide);
       if (!layer || !item) return;
-      layer.style.backgroundColor = "#080c18";
+      layer.style.backgroundColor = "transparent";
       layer.style.backgroundImage = `url("${item.url}")`;
       layer.style.backgroundPosition = `${item.posX}% ${item.posY}%`;
       layer.style.backgroundSize = `${item.scale}% auto`;
@@ -49,18 +58,35 @@
 
     setVisibleLayer(layerIndex) {
       this.layers.forEach((layer, i) => {
-        layer.classList.toggle("is-visible", i === layerIndex);
+        const on = i === layerIndex;
+        layer.classList.toggle("is-visible", on);
+        if (!on) {
+          layer.style.pointerEvents = "none";
+        }
       });
       this.activeLayer = layerIndex;
     }
 
+    scheduleClearLayer(layer) {
+      if (this.clearTimer) clearTimeout(this.clearTimer);
+      this.clearTimer = setTimeout(() => {
+        this.clearTimer = null;
+        if (layer && !layer.classList.contains("is-visible")) {
+          this.clearLayer(layer);
+        }
+      }, FADE_MS + 80);
+    }
+
     advance() {
       if (this.slides.length < 2) return;
+      const prevLayer = this.activeLayer;
       const nextIndex = (this.index + 1) % this.slides.length;
-      const inactiveLayer = 1 - this.activeLayer;
-      this.paintLayer(this.layers[inactiveLayer], this.slides[nextIndex]);
-      this.setVisibleLayer(inactiveLayer);
+      const nextLayer = 1 - prevLayer;
+      this.clearLayer(this.layers[nextLayer]);
+      this.paintLayer(this.layers[nextLayer], this.slides[nextIndex]);
+      this.setVisibleLayer(nextLayer);
       this.index = nextIndex;
+      this.scheduleClearLayer(this.layers[prevLayer]);
     }
 
     stop() {
@@ -69,11 +95,15 @@
         clearInterval(this.timer);
         this.timer = null;
       }
+      if (this.clearTimer) {
+        clearTimeout(this.clearTimer);
+        this.clearTimer = null;
+      }
       this.root.classList.add("hidden");
       this.root.setAttribute("aria-hidden", "true");
       this.layers.forEach((layer) => {
         layer.classList.remove("is-visible");
-        layer.style.backgroundImage = "";
+        this.clearLayer(layer);
       });
       document.body.classList.remove("ad-bg-slideshow-active");
     }
@@ -88,7 +118,9 @@
       this.root.setAttribute("aria-hidden", "false");
       document.body.classList.add("ad-bg-slideshow-active");
       this.index = 0;
+      this.layers.forEach((layer) => this.clearLayer(layer));
       this.paintLayer(this.layers[0], this.slides[0]);
+      this.clearLayer(this.layers[1]);
       this.setVisibleLayer(0);
       if (this.timer) clearInterval(this.timer);
       this.timer = setInterval(() => this.advance(), INTERVAL_MS);

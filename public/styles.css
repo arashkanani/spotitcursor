@@ -47,7 +47,7 @@ body {
 .ad-bg-slideshow {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
   overflow: hidden;
 }
@@ -69,12 +69,26 @@ body {
 }
 
 body.ad-bg-slideshow-active > .bg-mesh {
-  background-image: none !important;
-  background-color: #080c18 !important;
+  opacity: 1;
 }
 
-body.ad-bg-slideshow-active[data-bg="custom"] > .bg-mesh {
-  opacity: 0;
+body.ad-bg-slideshow-active > .bg-photo-overlay {
+  display: none !important;
+  background-image: none !important;
+}
+
+.bg-photo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  display: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+}
+
+body[data-has-custom-bg="true"]:not(.ad-bg-slideshow-active) > .bg-photo-overlay {
+  display: block;
 }
 
 .bg-vignette {
@@ -2425,56 +2439,41 @@ body[data-ranking-panel="transparent"] .rank-item:hover .leaderboard-row,
   background: rgba(92, 225, 230, 0.12);
 }
 
-body[data-bg="custom"] {
-  background: linear-gradient(165deg, #1a2744 0%, #101828 45%, #0a1020 100%);
+#setupPreviewScene {
+  position: relative;
 }
 
-body[data-bg="custom"] > .bg-mesh {
-  background: none;
-  background-color: transparent;
-}
-
-body[data-bg="custom"] .bg-vignette,
-[data-bg="custom"] .setup-preview-vignette {
-  opacity: 0;
-}
-
-body[data-bg="custom"] .bg-orb,
-body[data-bg="custom"] .bg-sparkle {
-  opacity: 0;
-}
-
-#setupPreviewScene[data-bg="custom"]::before {
+#setupPreviewScene::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.45;
-  background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0% 25%, transparent 0% 50%) 50% / 20px 20px,
-    linear-gradient(165deg, #1e2d4a 0%, #121c30 100%);
 }
 
-.setup-game-preview-panel .setup-preview-viewport:has([data-bg="custom"]) {
-  background: #121c30;
-}
-
-.setup-game-preview-panel[data-bg="custom"] .setup-preview-bg,
-.setup-game-preview-panel[data-bg="custom"] .setup-preview-bg-img {
-  z-index: 0;
-}
-
-.setup-game-preview-panel[data-bg="custom"] .setup-preview-inner {
+#setupPreviewScene[data-has-custom-bg="true"] .setup-preview-bg {
   z-index: 1;
+  background-color: transparent !important;
+  background-image: var(--custom-bg-url, none) !important;
+  background-position: var(--custom-bg-pos-x, 50%) var(--custom-bg-pos-y, 50%) !important;
+  background-size: var(--custom-bg-size, 100% auto) !important;
+  background-repeat: no-repeat !important;
 }
 
-#setupPreviewScene[data-bg="custom"] .setup-preview-bg {
-  background-color: transparent;
+#setupPreviewScene:not([data-has-custom-bg="true"]) .setup-preview-bg {
+  display: none;
+}
+
+body[data-has-custom-bg="true"] > .bg-photo-overlay {
   background-image: var(--custom-bg-url, none);
   background-position: var(--custom-bg-pos-x, 50%) var(--custom-bg-pos-y, 50%);
   background-size: var(--custom-bg-size, 100% auto);
   background-repeat: no-repeat;
+}
+
+.setup-game-preview-panel .setup-preview-inner {
+  position: relative;
+  z-index: 1;
 }
 
 .theme-bg-swatch-custom {
@@ -2622,10 +2621,10 @@ body[data-bg="custom"] .bg-sparkle {
   overflow: hidden;
 }
 
-/* Background themes */
+/* Background themes — color layer */
 body[data-bg="midnight"] .bg-mesh,
 [data-bg="midnight"] .bg-mesh,
-#setupPreviewScene[data-bg="midnight"] .setup-preview-bg {
+#setupPreviewScene[data-bg="midnight"]::before {
   background:
     radial-gradient(ellipse 80% 50% at 20% -10%, rgba(92, 225, 230, 0.18), transparent 55%),
     radial-gradient(ellipse 70% 45% at 90% 10%, rgba(139, 124, 248, 0.2), transparent 50%),
@@ -2635,7 +2634,7 @@ body[data-bg="midnight"] .bg-mesh,
 
 body[data-bg="ocean"] .bg-mesh,
 [data-bg="ocean"] .bg-mesh,
-#setupPreviewScene[data-bg="ocean"] .setup-preview-bg {
+#setupPreviewScene[data-bg="ocean"]::before {
   background:
     radial-gradient(ellipse 75% 55% at 15% 0%, rgba(56, 189, 248, 0.28), transparent 55%),
     radial-gradient(ellipse 65% 45% at 95% 20%, rgba(14, 165, 233, 0.22), transparent 50%),
@@ -2646,7 +2645,7 @@ body[data-bg="ocean"] { --accent-cyan: #38bdf8; --accent-violet: #60a5fa; }
 
 body[data-bg="sunset"] .bg-mesh,
 [data-bg="sunset"] .bg-mesh,
-#setupPreviewScene[data-bg="sunset"] .setup-preview-bg {
+#setupPreviewScene[data-bg="sunset"]::before {
   background:
     radial-gradient(ellipse 70% 50% at 80% 0%, rgba(251, 146, 60, 0.35), transparent 55%),
     radial-gradient(ellipse 60% 45% at 10% 30%, rgba(244, 114, 182, 0.2), transparent 50%),
@@ -2657,7 +2656,7 @@ body[data-bg="sunset"] { --accent-cyan: #fb923c; --accent-gold: #fcd34d; --accen
 
 body[data-bg="emerald"] .bg-mesh,
 [data-bg="emerald"] .bg-mesh,
-#setupPreviewScene[data-bg="emerald"] .setup-preview-bg {
+#setupPreviewScene[data-bg="emerald"]::before {
   background:
     radial-gradient(ellipse 70% 50% at 20% 10%, rgba(52, 211, 153, 0.28), transparent 55%),
     radial-gradient(ellipse 60% 45% at 90% 80%, rgba(16, 185, 129, 0.2), transparent 50%),
@@ -2668,7 +2667,7 @@ body[data-bg="emerald"] { --accent-cyan: #34d399; --accent-violet: #6ee7b7; }
 
 body[data-bg="royal"] .bg-mesh,
 [data-bg="royal"] .bg-mesh,
-#setupPreviewScene[data-bg="royal"] .setup-preview-bg {
+#setupPreviewScene[data-bg="royal"]::before {
   background:
     radial-gradient(ellipse 75% 55% at 70% 0%, rgba(167, 139, 250, 0.32), transparent 55%),
     radial-gradient(ellipse 60% 45% at 5% 60%, rgba(192, 132, 252, 0.18), transparent 50%),

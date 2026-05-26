@@ -13,6 +13,7 @@
 </head>
 <body>
   <div class="bg-mesh"></div>
+  <div class="bg-photo-overlay" aria-hidden="true"></div>
   <div class="bg-vignette"></div>
   <div class="bg-orb orb-1"></div>
   <div class="bg-orb orb-2"></div>
@@ -35,7 +36,7 @@
 
           <div class="setup-section">
             <h3 class="setup-section-title">Background</h3>
-            <p class="setup-hint">Pick a preset or upload advertising images (JPG, PNG, WebP). Upload several — during the live game they rotate every 5 seconds with a fade.</p>
+            <p class="setup-hint">Pick a <strong>background color</strong> below, then upload advertising images (PNG works best) to layer on top. Upload several — during the live game they rotate every 5 seconds with a fade.</p>
             <div id="backgroundPicker" class="theme-option-grid theme-bg-grid" role="listbox" aria-label="Background"></div>
             <div class="background-upload-row">
               <label class="photo-upload-btn" for="customBackgroundInput">Add advertising background</label>
@@ -349,6 +350,7 @@
     const continueToLobbyBtn = document.getElementById("continueToLobbyBtn");
     const backgroundPicker = document.getElementById("backgroundPicker");
     const setupLiveDemo = document.getElementById("setupLiveDemo");
+    const bgPhotoOverlay = document.querySelector("body > .bg-photo-overlay");
     const setupPreviewScene = document.getElementById("setupPreviewScene");
     const setupPreviewBgImg = document.getElementById("setupPreviewBgImg");
     const setupPreviewViewport = setupLiveDemo?.querySelector(".setup-preview-viewport");
@@ -485,6 +487,42 @@
     let setupPhase = "customize";
 
     const DEFAULT_THEME_BACKGROUND = "midnight";
+    const PRESET_THEME_BACKGROUNDS = new Set([
+      "midnight",
+      "ocean",
+      "sunset",
+      "emerald",
+      "royal"
+    ]);
+
+    function isPresetThemeBackground(bg) {
+      return PRESET_THEME_BACKGROUNDS.has(bg);
+    }
+
+    function getPresetThemeBackground() {
+      return isPresetThemeBackground(selectedThemeBackground)
+        ? selectedThemeBackground
+        : DEFAULT_THEME_BACKGROUND;
+    }
+
+    function hasCustomBackgroundOverlays() {
+      return customBackgrounds.length > 0;
+    }
+
+    function syncCustomBgDataset() {
+      const preset = getPresetThemeBackground();
+      const hasOverlays = hasCustomBackgroundOverlays();
+      document.body.dataset.bg = preset;
+      document.body.dataset.hasCustomBg = hasOverlays ? "true" : "false";
+      if (setupPreviewScene) {
+        setupPreviewScene.dataset.bg = preset;
+        setupPreviewScene.dataset.hasCustomBg = hasOverlays ? "true" : "false";
+      }
+      if (setupLiveDemo) {
+        setupLiveDemo.dataset.bg = preset;
+        setupLiveDemo.dataset.hasCustomBg = hasOverlays ? "true" : "false";
+      }
+    }
 
     function stripBackgroundUrlQuery(url) {
       if (!url) return null;
@@ -633,7 +671,6 @@
       if (!entry) return;
       selectedBackgroundUrl = entry.url;
       customBackgroundUrl = entry.url;
-      selectedThemeBackground = "custom";
       syncLegacyTransformFromEntry(entry);
       syncThemePickerUi();
       renderCustomBackgroundList();
@@ -680,7 +717,7 @@
 
     function updateCustomBackgroundAdjustPanel() {
       const entry = getSelectedBackgroundEntry();
-      const hasCustom = selectedThemeBackground === "custom" && customBackgrounds.length > 0;
+      const hasCustom = hasCustomBackgroundOverlays();
       const onDashboard = isSetupCustomizeView();
       const show = hasCustom && onDashboard;
       document.body.classList.toggle("host-editing-custom-bg", show);
@@ -822,22 +859,16 @@
       if (!setupPreviewScene || !mesh) return;
 
       const previewEntry = getSelectedBackgroundEntry();
-      const isCustom = selectedThemeBackground === "custom" && !!previewEntry;
-      const presetBg = selectedThemeBackground || "midnight";
+      const hasOverlays = hasCustomBackgroundOverlays() && !!previewEntry;
       setupPreviewScene.dataset.pattern = selectedThemePattern || "classic";
-      setupPreviewScene.dataset.bg = isCustom ? "custom" : presetBg;
-      if (setupLiveDemo) {
-        setupLiveDemo.dataset.bg = isCustom ? "custom" : presetBg;
-      }
+      syncCustomBgDataset();
 
-      if (!isCustom) {
+      if (!hasOverlays) {
         setupPreviewScene.style.removeProperty("--custom-bg-url");
         setupPreviewScene.style.removeProperty("--custom-bg-pos-x");
         setupPreviewScene.style.removeProperty("--custom-bg-pos-y");
         setupPreviewScene.style.removeProperty("--custom-bg-size");
         clearCustomBgMesh(mesh);
-        mesh.style.removeProperty("background");
-        mesh.style.removeProperty("background-image");
         if (setupPreviewBgImg) {
           setupPreviewBgImg.hidden = true;
           setupPreviewBgImg.removeAttribute("src");
@@ -864,42 +895,24 @@
 
     function applyCustomBackgroundTransform() {
       const previewEntry = getSelectedBackgroundEntry();
-      const isCustom = selectedThemeBackground === "custom" && !!previewEntry;
-      const pageChrome = !isSetupCustomizeView() || !isCustom;
-      const targets = getThemeApplyTargets(pageChrome);
+      const hasOverlays = hasCustomBackgroundOverlays() && !!previewEntry;
+      syncCustomBgDataset();
 
-      for (const el of targets) {
-        if (isCustom) {
-          el.style.setProperty("--custom-bg-pos-x", `${previewEntry.posX}%`);
-          el.style.setProperty("--custom-bg-pos-y", `${previewEntry.posY}%`);
-          el.style.setProperty("--custom-bg-size", `${previewEntry.scale}% auto`);
-          if (el === setupPreviewScene) {
-            el.style.setProperty(
-              "--custom-bg-url",
-              `url("${customBgDisplayUrl(previewEntry.url, previewBgCacheVersion)}")`
-            );
-          }
-        } else {
-          el.style.removeProperty("--custom-bg-pos-x");
-          el.style.removeProperty("--custom-bg-pos-y");
-          el.style.removeProperty("--custom-bg-size");
-        }
-      }
-
-      if (isSetupCustomizeView() && isCustom) {
-        document.documentElement.style.removeProperty("--custom-bg-url");
-        document.body.style.removeProperty("--custom-bg-url");
-        document.body.style.removeProperty("--custom-bg-pos-x");
-        document.body.style.removeProperty("--custom-bg-pos-y");
-        document.body.style.removeProperty("--custom-bg-size");
-      }
-
-      if (isCustom) {
-        applyPreviewBackgroundLayer();
-        paintAllCustomBackgroundMeshes();
+      if (hasOverlays) {
+        const bustUrl = customBgDisplayUrl(previewEntry.url, previewBgCacheVersion);
+        document.documentElement.style.setProperty("--custom-bg-pos-x", `${previewEntry.posX}%`);
+        document.documentElement.style.setProperty("--custom-bg-pos-y", `${previewEntry.posY}%`);
+        document.documentElement.style.setProperty("--custom-bg-size", `${previewEntry.scale}% auto`);
+        document.documentElement.style.setProperty("--custom-bg-url", `url("${bustUrl}")`);
       } else {
-        paintAllCustomBackgroundMeshes();
+        document.documentElement.style.removeProperty("--custom-bg-url");
+        document.documentElement.style.removeProperty("--custom-bg-pos-x");
+        document.documentElement.style.removeProperty("--custom-bg-pos-y");
+        document.documentElement.style.removeProperty("--custom-bg-size");
       }
+
+      applyPreviewBackgroundLayer();
+      paintAllCustomBackgroundMeshes();
 
       updateCustomBackgroundAdjustPanel();
       updateCustomUploadSwatch();
@@ -997,7 +1010,6 @@
         { url: blobUrl, posX: 50, posY: 50, scale: 100 }
       ];
       applyBackgroundEntries(merged);
-      selectedThemeBackground = "custom";
       selectedBackgroundUrl = blobUrl;
       customBackgroundUrl = blobUrl;
       return blobUrl;
@@ -1025,7 +1037,6 @@
     }
 
     function uploadResponseLooksValid(branding) {
-      if (!branding || branding.themeBackground !== "custom") return false;
       return extractBackgroundsFromBranding(branding).length > 0;
     }
 
@@ -1043,7 +1054,7 @@
     }
 
     function isAdSlideshowEligible() {
-      return selectedThemeBackground === "custom"
+      return hasCustomBackgroundOverlays()
         && customBackgrounds.length > 1
         && gameView
         && !gameView.classList.contains("hidden");
@@ -1059,7 +1070,11 @@
       if (!running) {
         paintAllCustomBackgroundMeshes(previewBgCacheVersion);
       } else {
-        document.querySelectorAll("body > .bg-mesh").forEach(clearCustomBgMesh);
+        clearPhotoOverlay();
+        document.documentElement.style.removeProperty("--custom-bg-url");
+        document.documentElement.style.removeProperty("--custom-bg-pos-x");
+        document.documentElement.style.removeProperty("--custom-bg-pos-y");
+        document.documentElement.style.removeProperty("--custom-bg-size");
       }
     }
 
@@ -1070,20 +1085,7 @@
     }
 
     function updateCustomUploadSwatch() {
-      if (!backgroundPicker) return;
-      const swatch = backgroundPicker.querySelector(".theme-bg-custom .theme-bg-swatch-custom");
-      if (!swatch) return;
-      const previewEntry = getSelectedBackgroundEntry() || customBackgrounds[0] || null;
-      if (selectedThemeBackground === "custom" && previewEntry) {
-        const bust = customBgDisplayUrl(previewEntry.url, previewBgCacheVersion);
-        if (bust) {
-          swatch.style.backgroundImage = `url("${bust}")`;
-          swatch.textContent = "";
-          return;
-        }
-      }
-      swatch.style.backgroundImage = "";
-      swatch.textContent = "+";
+      // Preset swatches only — uploaded photos appear in the list and live preview.
     }
 
     function updateBackgroundListChrome() {
@@ -1265,105 +1267,80 @@
       mesh.style.setProperty("background-repeat", "no-repeat", "important");
     }
 
+    function clearPhotoOverlay() {
+      if (bgPhotoOverlay) clearCustomBgMesh(bgPhotoOverlay);
+    }
+
     function paintAllCustomBackgroundMeshes(cacheVersion) {
-      if (isAdSlideshowEligible()) return;
+      if (isAdSlideshowEligible()) {
+        clearPhotoOverlay();
+        return;
+      }
       const previewEntry = getSelectedBackgroundEntry();
-      const isCustom = selectedThemeBackground === "custom" && !!previewEntry;
-      const bustUrl = isCustom
+      const hasOverlays = hasCustomBackgroundOverlays() && !!previewEntry;
+      const bustUrl = hasOverlays
         ? customBgDisplayUrl(previewEntry.url, cacheVersion ?? previewBgCacheVersion)
         : null;
-      const editingInDashboard = isSetupCustomizeView() && isCustom;
+      const editingInDashboard = isSetupCustomizeView();
 
-      if (!isCustom || !bustUrl) {
-        document.querySelectorAll("body > .bg-mesh").forEach(clearCustomBgMesh);
-        const previewMesh = setupPreviewScene?.querySelector(".setup-preview-bg");
-        if (previewMesh) clearCustomBgMesh(previewMesh);
-        if (setupPreviewBgImg) {
-          setupPreviewBgImg.hidden = true;
-          setupPreviewBgImg.removeAttribute("src");
+      syncCustomBgDataset();
+
+      if (!hasOverlays || !bustUrl) {
+        clearPhotoOverlay();
+        if (!editingInDashboard) {
+          const previewMesh = setupPreviewScene?.querySelector(".setup-preview-bg");
+          if (previewMesh) clearCustomBgMesh(previewMesh);
         }
         return;
       }
 
-      if (!editingInDashboard) {
-        const staticEntry = isAdSlideshowEligible()
-          ? getCustomBackgroundSlides()[0]
-          : previewEntry;
-        document.querySelectorAll("body > .bg-mesh").forEach((mesh) => {
-          paintCustomBgMesh(mesh, bustUrl, staticEntry);
-        });
+      if (!editingInDashboard && bgPhotoOverlay) {
+        const staticEntry = previewEntry;
+        paintCustomBgMesh(bgPhotoOverlay, bustUrl, staticEntry);
+      } else {
+        clearPhotoOverlay();
       }
       applyPreviewBackgroundLayer(cacheVersion);
     }
 
     function applyGameTheme(_pattern, background, customUrl, cacheVersion) {
       selectedThemePattern = FIXED_THEME_PATTERN;
-      if (background) selectedThemeBackground = background;
+      if (background && background !== "custom") {
+        selectedThemeBackground = background;
+      } else if (background === "custom" && !hasCustomBackgroundOverlays()) {
+        selectedThemeBackground = getPresetThemeBackground();
+      }
 
-      if (selectedThemeBackground === "custom") {
-        if (customUrl !== undefined) {
-          const single = stripBackgroundUrlQuery(customUrl);
-          if (single && !customBackgrounds.some((entry) => entry.url === single)) {
-            customBackgrounds.unshift({
-              url: single,
-              posX: 50,
-              posY: 50,
-              scale: 100
-            });
-          }
-          customBackgroundUrls = customBackgrounds.map((entry) => entry.url);
-          customBackgroundUrl = selectedBackgroundUrl || customBackgroundUrls[0] || single || null;
-          if (!selectedBackgroundUrl) selectedBackgroundUrl = customBackgroundUrl;
+      if (customUrl !== undefined) {
+        const single = stripBackgroundUrlQuery(customUrl);
+        if (single && !customBackgrounds.some((entry) => stripBackgroundUrlQuery(entry.url) === single)) {
+          customBackgrounds.unshift({
+            url: single,
+            posX: 50,
+            posY: 50,
+            scale: 100
+          });
         }
-      } else {
-        customBackgroundUrl = null;
-        customBackgroundUrls = [];
-        customBackgrounds = [];
-        selectedBackgroundUrl = null;
+        customBackgroundUrls = customBackgrounds.map((entry) => entry.url);
+        customBackgroundUrl = selectedBackgroundUrl || customBackgroundUrls[0] || single || null;
+        if (!selectedBackgroundUrl) selectedBackgroundUrl = customBackgroundUrl;
       }
 
-      const isCustom = selectedThemeBackground === "custom" && customBackgrounds.length > 0;
-      const editingInDashboard = isSetupCustomizeView() && isCustom;
-      const pageBg = editingInDashboard
-        ? DEFAULT_THEME_BACKGROUND
-        : selectedThemeBackground;
-
-      document.body.dataset.pattern = selectedThemePattern || "classic";
-      document.body.dataset.bg = pageBg;
-
-      const themeTargets = getThemeApplyTargets(!editingInDashboard);
-      for (const el of themeTargets) {
-        el.style.removeProperty("--custom-bg-url");
-      }
-      if (editingInDashboard) {
-        document.documentElement.style.removeProperty("--custom-bg-url");
-        document.body.style.removeProperty("--custom-bg-url");
+      if (!isPresetThemeBackground(selectedThemeBackground)) {
+        selectedThemeBackground = getPresetThemeBackground();
       }
 
       if (cacheVersion) {
         previewBgCacheVersion = cacheVersion;
       }
 
-      if (isCustom) {
-        const previewEntry = getSelectedBackgroundEntry();
-        const bustUrl = customBgDisplayUrl(
-          previewEntry?.url || customBackgroundUrl,
-          cacheVersion || previewBgCacheVersion
-        );
-        const urlValue = `url("${bustUrl}")`;
-        const previewTargets = setupPreviewScene ? [setupPreviewScene] : [];
-        if (!editingInDashboard) {
-          previewTargets.unshift(document.documentElement, document.body);
-        }
-        for (const el of previewTargets) {
-          el.style.setProperty("--custom-bg-url", urlValue);
-        }
-      }
+      document.body.dataset.pattern = selectedThemePattern || "classic";
+      syncCustomBgDataset();
 
       if (setupLiveDemo) {
         setupLiveDemo.dataset.pattern = selectedThemePattern || "classic";
-        setupLiveDemo.dataset.bg = isCustom ? "custom" : (selectedThemeBackground || "midnight");
       }
+
       applyPreviewBackgroundLayer(cacheVersion || previewBgCacheVersion);
       paintAllCustomBackgroundMeshes(cacheVersion || previewBgCacheVersion);
       fitSetupPreviewScale();
@@ -1371,7 +1348,6 @@
       applyCustomBackgroundTransform();
       syncThemePickerUi();
       updateClearBackgroundButton();
-      updateCustomUploadSwatch();
       renderCustomBackgroundList();
       refreshAdBackgroundPlayback();
       if (isSetupCustomizeView()) refreshDashboardPreview();
@@ -1395,7 +1371,7 @@
     }
 
     async function clearCustomBackground() {
-      if (!customBackgrounds.length && selectedThemeBackground !== "custom") return;
+      if (!customBackgrounds.length) return;
       const fallbackBg = DEFAULT_THEME_BACKGROUND;
       if (customBackgroundStatus) customBackgroundStatus.textContent = "Removing upload…";
       clearCustomBackgroundBtn.disabled = true;
@@ -1442,7 +1418,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             themePattern: selectedThemePattern,
-            themeBackground: selectedThemeBackground,
+            themeBackground: getPresetThemeBackground(),
             circlesPanelTransparent,
             rankingPanelTransparent,
             ...getBackgroundTransformPayload()
@@ -1455,8 +1431,9 @@
 
     function syncThemePickerUi() {
       if (backgroundPicker) {
+        const preset = getPresetThemeBackground();
         backgroundPicker.querySelectorAll(".theme-bg-card").forEach((card) => {
-          const on = card.dataset.value === selectedThemeBackground;
+          const on = card.dataset.value === preset;
           card.classList.toggle("is-selected", on);
           card.setAttribute("aria-selected", on ? "true" : "false");
         });
@@ -1535,9 +1512,11 @@
       lobbyView?.classList.add("hidden");
       gameView?.classList.add("hidden");
       showSetupPhase("customize");
-      const bg = selectedThemeBackground || DEFAULT_THEME_BACKGROUND;
-      const customUrl = bg === "custom" ? (customBackgroundUrl || undefined) : undefined;
-      applyGameTheme(FIXED_THEME_PATTERN, bg, customUrl);
+      applyGameTheme(
+        FIXED_THEME_PATTERN,
+        getPresetThemeBackground(),
+        customBackgroundUrl || undefined
+      );
       scheduleDashboardPreview();
     }
 
@@ -1572,29 +1551,7 @@
         backgroundPicker.appendChild(btn);
       }
 
-      const customBtn = document.createElement("button");
-      customBtn.type = "button";
-      customBtn.className = "theme-bg-card theme-bg-custom";
-      customBtn.dataset.value = "custom";
-      customBtn.setAttribute("role", "option");
-      customBtn.innerHTML = `
-        <span class="theme-bg-swatch theme-bg-swatch-custom" aria-hidden="true">+</span>
-        <span class="theme-option-name">Your upload</span>
-      `;
-      customBtn.title = "Use uploaded background image";
-      customBtn.addEventListener("click", () => {
-        if (!customBackgrounds.length) {
-          customBackgroundInput?.click();
-          return;
-        }
-        applyGameTheme(selectedThemePattern, "custom", customBackgroundUrl);
-        updateSetupPreview();
-        refreshDashboardPreview();
-      });
-      backgroundPicker.appendChild(customBtn);
-
       syncThemePickerUi();
-      updateCustomUploadSwatch();
     }
 
     const DEMO_FALLBACK_SHAPES = [
@@ -1652,14 +1609,11 @@
       syncCustomBackgroundsFromBranding(branding);
       renderCustomBackgroundList();
       let bg = branding?.themeBackground || selectedThemeBackground;
-      if (customBackgrounds.length) {
-        bg = "custom";
-      } else if (bg === "custom") {
+      if (!isPresetThemeBackground(bg)) {
         bg = DEFAULT_THEME_BACKGROUND;
       }
-      const customUrl = bg === "custom" && customBackgroundUrl
-        ? customBackgroundUrl
-        : null;
+      selectedThemeBackground = bg;
+      const customUrl = customBackgroundUrl || null;
       try {
         applyGameTheme(
           FIXED_THEME_PATTERN,
@@ -2065,7 +2019,6 @@
             );
           }
           lastData = data;
-          selectedThemeBackground = "custom";
           addBackgroundFromUploadResponse(data);
           renderCustomBackgroundList();
           if (customBackgroundStatus && files.length > 1) {
@@ -2074,12 +2027,11 @@
         }
         if (!lastData) return;
         previewBgCacheVersion = lastData.updatedAt || null;
-        selectedThemeBackground = "custom";
         if (!addBackgroundFromUploadResponse(lastData)) {
           throw new Error(staleServerUploadMessage());
         }
         try {
-          applyGameTheme(FIXED_THEME_PATTERN, "custom", undefined, previewBgCacheVersion);
+          applyGameTheme(FIXED_THEME_PATTERN, getPresetThemeBackground(), undefined, previewBgCacheVersion);
         } catch (themeErr) {
           console.error("applyGameTheme after upload failed", themeErr);
         }
@@ -2207,7 +2159,7 @@
         sponsorId: selectedSponsorId,
         sponsorName: sponsorCatalog.find((s) => s.id === selectedSponsorId)?.name,
         themePattern: selectedThemePattern,
-        themeBackground: selectedThemeBackground,
+        themeBackground: getPresetThemeBackground(),
         customBackgroundUrl,
         customBackgroundUrls,
         customBackgrounds,
@@ -2247,14 +2199,10 @@
       gameView.classList.add("hidden");
       syncPanelStyleAttributes();
       renderLobbyPlayers(latestLeaderboard);
-      let lobbyBg = selectedThemeBackground;
-      if (lobbyBg === "custom" && !customBackgrounds.length) {
-        lobbyBg = DEFAULT_THEME_BACKGROUND;
-      }
       applyGameTheme(
         FIXED_THEME_PATTERN,
-        lobbyBg,
-        lobbyBg === "custom" ? customBackgroundUrl : null
+        getPresetThemeBackground(),
+        customBackgroundUrl || null
       );
       refreshAdBackgroundPlayback();
     }
@@ -2354,10 +2302,7 @@
       setupMessage.textContent = "Saving…";
       try {
         socket.emit("hostResetGame");
-        let themeBg = selectedThemeBackground;
-        if (themeBg === "custom" && !customBackgrounds.length) {
-          themeBg = DEFAULT_THEME_BACKGROUND;
-        }
+        const themeBg = getPresetThemeBackground();
 
         const res = await fetch("/api/event-branding", {
           method: "PUT",
@@ -2367,9 +2312,9 @@
             sponsorId: selectedSponsorId,
             themePattern: selectedThemePattern,
             themeBackground: themeBg,
-            customBackgroundUrl: themeBg === "custom" ? customBackgroundUrl : null,
-            customBackgroundUrls: themeBg === "custom" ? customBackgroundUrls : [],
-            customBackgrounds: themeBg === "custom" ? customBackgrounds : [],
+            customBackgroundUrl: customBackgroundUrl || null,
+            customBackgroundUrls: customBackgroundUrls,
+            customBackgrounds: customBackgrounds,
             ...getBackgroundTransformPayload(),
             circlesPanelTransparent,
             rankingPanelTransparent

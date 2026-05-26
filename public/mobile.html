@@ -11,6 +11,7 @@
 </head>
 <body class="mobile-body" data-bg="midnight" data-pattern="classic">
   <div class="bg-mesh"></div>
+  <div class="bg-photo-overlay" aria-hidden="true"></div>
   <div class="bg-vignette"></div>
   <div class="page">
     <div class="mobile-wrap card" id="joinCard">
@@ -138,51 +139,87 @@
       return joined && gameCard && !gameCard.classList.contains("hidden");
     }
 
+    const MOBILE_PRESET_BACKGROUNDS = new Set([
+      "midnight",
+      "ocean",
+      "sunset",
+      "emerald",
+      "royal"
+    ]);
+
+    function resolveMobilePresetBackground(bg) {
+      return MOBILE_PRESET_BACKGROUNDS.has(bg) ? bg : "midnight";
+    }
+
     function refreshMobileAdPlayback() {
       if (typeof AdBackgroundSlideshow === "undefined") return;
       const branding = latestMobileBranding;
-      let bg = branding?.themeBackground || "midnight";
       const slides = getMobileBackgroundSlides(branding);
-      if (bg === "custom" && !slides.length) bg = "midnight";
-      const running = bg === "custom"
-        && slides.length > 1
-        && isMobileGameScreenActive();
+      const preset = resolveMobilePresetBackground(branding?.themeBackground || "midnight");
+      const running = slides.length > 1 && isMobileGameScreenActive();
       AdBackgroundSlideshow.update({
         slides: running ? slides : [],
         running
       });
       if (!running) {
-        paintMobileStaticBackground(branding, bg, slides[0] || null);
+        paintMobileStaticBackground(branding, preset, slides[0] || null);
+      } else {
+        const overlay = document.querySelector("body > .bg-photo-overlay");
+        if (overlay) {
+          overlay.style.backgroundImage = "";
+          overlay.style.backgroundPosition = "";
+          overlay.style.backgroundSize = "";
+          overlay.style.backgroundRepeat = "";
+        }
+        document.documentElement.style.removeProperty("--custom-bg-url");
+        document.documentElement.style.removeProperty("--custom-bg-pos-x");
+        document.documentElement.style.removeProperty("--custom-bg-pos-y");
+        document.documentElement.style.removeProperty("--custom-bg-size");
       }
     }
 
-    function paintMobileStaticBackground(branding, bg, slide) {
-      document.body.dataset.bg = bg;
+    function paintMobileStaticBackground(branding, presetBg, slide) {
+      const hasOverlay = !!slide?.url;
+      document.body.dataset.bg = presetBg;
+      document.body.dataset.hasCustomBg = hasOverlay ? "true" : "false";
       document.body.dataset.pattern = branding?.themePattern || "classic";
+      const overlay = document.querySelector("body > .bg-photo-overlay");
       const mesh = document.querySelector("body > .bg-mesh");
-      if (bg === "custom" && slide?.url) {
+      if (hasOverlay) {
         const posX = slide.posX ?? 50;
         const posY = slide.posY ?? 50;
         const scale = slide.scale ?? 100;
         const bustUrl = slide.url;
-        document.body.style.setProperty("--custom-bg-url", `url("${bustUrl}")`);
-        document.body.style.setProperty("--custom-bg-pos-x", `${posX}%`);
-        document.body.style.setProperty("--custom-bg-pos-y", `${posY}%`);
-        document.body.style.setProperty("--custom-bg-size", `${scale}% auto`);
+        document.documentElement.style.setProperty("--custom-bg-url", `url("${bustUrl}")`);
+        document.documentElement.style.setProperty("--custom-bg-pos-x", `${posX}%`);
+        document.documentElement.style.setProperty("--custom-bg-pos-y", `${posY}%`);
+        document.documentElement.style.setProperty("--custom-bg-size", `${scale}% auto`);
+        if (overlay) {
+          overlay.style.backgroundColor = "transparent";
+          overlay.style.backgroundImage = `url("${bustUrl}")`;
+          overlay.style.backgroundPosition = `${posX}% ${posY}%`;
+          overlay.style.backgroundSize = `${scale}% auto`;
+          overlay.style.backgroundRepeat = "no-repeat";
+        }
         if (mesh) {
-          mesh.style.backgroundColor = "transparent";
-          mesh.style.backgroundImage = `url("${bustUrl}")`;
-          mesh.style.backgroundPosition = `${posX}% ${posY}%`;
-          mesh.style.backgroundSize = `${scale}% auto`;
-          mesh.style.backgroundRepeat = "no-repeat";
+          mesh.style.removeProperty("background-image");
+          mesh.style.removeProperty("background-position");
+          mesh.style.removeProperty("background-size");
+          mesh.style.removeProperty("background-repeat");
         }
       } else {
-        document.body.style.removeProperty("--custom-bg-url");
-        document.body.style.removeProperty("--custom-bg-pos-x");
-        document.body.style.removeProperty("--custom-bg-pos-y");
-        document.body.style.removeProperty("--custom-bg-size");
+        document.documentElement.style.removeProperty("--custom-bg-url");
+        document.documentElement.style.removeProperty("--custom-bg-pos-x");
+        document.documentElement.style.removeProperty("--custom-bg-pos-y");
+        document.documentElement.style.removeProperty("--custom-bg-size");
+        if (overlay) {
+          overlay.style.removeProperty("background");
+          overlay.style.removeProperty("background-image");
+          overlay.style.removeProperty("background-position");
+          overlay.style.removeProperty("background-size");
+          overlay.style.removeProperty("background-repeat");
+        }
         if (mesh) {
-          mesh.style.removeProperty("background");
           mesh.style.removeProperty("background-image");
           mesh.style.removeProperty("background-position");
           mesh.style.removeProperty("background-size");
