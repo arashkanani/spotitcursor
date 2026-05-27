@@ -83,8 +83,9 @@
       </div>
     </div>
   </div>
-  <script src="/auth-client.js"></script>
   <script>
+    const fetchSession = (url, opts = {}) => fetch(url, { credentials: "include", ...opts });
+
     let activityOffset = 0;
 
     function escapeHtml(text) {
@@ -107,11 +108,10 @@
     }
 
     async function loadUsers() {
-      let data;
-      try {
-        data = await ShapeMatchAuth.apiFetch("/api/admin/users");
-      } catch (err) {
-        showErr(err.message || "Could not load users.");
+      const res = await fetchSession("/api/admin/users");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr(data.error || `Could not load users (${res.status}).`);
         return;
       }
       const body = document.getElementById("usersBody");
@@ -129,13 +129,10 @@
         document.getElementById("activityBody").innerHTML = "";
       }
       const lim = 50;
-      let data;
-      try {
-        data = await ShapeMatchAuth.apiFetch(
-          `/api/admin/activity?limit=${lim}&offset=${activityOffset}`
-        );
-      } catch (err) {
-        showErr(err.message || "Could not load activity.");
+      const res = await fetchSession(`/api/admin/activity?limit=${lim}&offset=${activityOffset}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr(data.error || `Could not load activity (${res.status}).`);
         return;
       }
       const body = document.getElementById("activityBody");

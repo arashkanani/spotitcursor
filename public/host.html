@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="/styles.css">
   <script src="/player-ui.js"></script>
   <script src="/ad-background-slideshow.js"></script>
-  <script src="/auth-client.js"></script>
 </head>
 <body>
   <div class="bg-mesh"></div>
@@ -712,17 +711,15 @@
     }
 
     async function refreshAccountUi() {
-      try {
-        sessionUser = await ShapeMatchAuth.getSession();
-      } catch (_err) {
-        sessionUser = null;
-      }
+      const res = await fetch("/api/auth/me");
+      const data = await res.json().catch(() => ({}));
+      sessionUser = data.user || null;
       if (!hostAccountSummary) {
         return;
       }
       if (!sessionUser) {
         hostAccountSummary.innerHTML =
-          '<span class="host-account-signed-out">Guests can host freely — <a href="/account?next=' +
+          '<span class="host-account-signed-out">Guests can host freely — <a href="/account.html?next=' +
           encodeURIComponent("/") +
           '">Sign in</a> to save dashboards.</span>';
         savedDashboardsControls?.classList.add("hidden");
@@ -741,7 +738,6 @@
         ' · <button type="button" class="host-account-linkish" id="hostSignOutBtn">Sign out</button>';
       savedDashboardsControls?.classList.remove("hidden");
       savedDashboardsHint?.classList.add("hidden");
-      await refreshDashboardList();
     }
 
     async function refreshDashboardList() {
@@ -774,11 +770,7 @@
         if (!ev.target || ev.target.id !== "hostSignOutBtn") {
           return;
         }
-        try {
-          await ShapeMatchAuth.logout();
-        } catch (_e) {
-          /* ignore */
-        }
+        await fetch("/api/auth/logout", { method: "POST" });
         sessionUser = null;
         refreshAccountUi();
         refreshDashboardList();
@@ -2591,10 +2583,6 @@
         setupMessage.textContent = "Dashboard removed.";
       });
     }
-
-    refreshAccountUi()
-      .then(() => refreshDashboardList())
-      .catch(() => {});
 
     loadSponsorCatalog().catch(() => {
       sponsorGridHint.textContent = "Could not load sponsors. Is the server running?";
