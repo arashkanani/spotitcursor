@@ -1399,12 +1399,23 @@
       }
       if (customBackgroundStatus) customBackgroundStatus.textContent = "Removing image…";
       try {
-        const res = await fetch(`/api/event-background?url=${encodeURIComponent(target)}`, {
+        let res = await fetch(`/api/event-background?url=${encodeURIComponent(target)}`, {
           method: "DELETE"
         });
-        const data = await parseApiJson(res);
+        let data = await parseApiJson(res);
+        if (!res.ok && res.status === 404) {
+          res = await fetch("/api/event-background/remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: target })
+          });
+          data = await parseApiJson(res);
+        }
         if (!res.ok) throw new Error(data.error || "Could not remove image.");
         applyEventBranding(data);
+        renderCustomBackgroundList();
+        refreshAdBackgroundPlayback();
+        if (setupPhase === "customize") updateSetupPreview();
         if (customBackgroundStatus) customBackgroundStatus.textContent = "Image removed.";
       } catch (err) {
         if (customBackgroundStatus) {

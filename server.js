@@ -835,6 +835,22 @@ function deleteStoredBackgroundFile(url) {
   return true;
 }
 
+function canDeleteBackgroundFile(req, url) {
+  const base = eventBrandingStore.stripBackgroundUrlQuery(url);
+  if (!base) return false;
+  const userMatch = base.match(/^\/event-backgrounds\/users\/([^/]+)\//i);
+  if (!userMatch) return true;
+  if (!req.user?.id) return false;
+  return userMatch[1] === req.user.id;
+}
+
+function findBackgroundEntryIndex(backgrounds, targetUrl) {
+  const target = eventBrandingStore.stripBackgroundUrlQuery(targetUrl);
+  return backgrounds.findIndex(
+    (entry) => eventBrandingStore.stripBackgroundUrlQuery(entry.url) === target
+  );
+}
+
 function clearUserBackgroundFiles(userId) {
   const dir = path.join(BACKGROUNDS_DIR, "users", userId);
   if (!fs.existsSync(dir)) return;
@@ -933,6 +949,12 @@ app.patch("/api/event-branding/theme", (req, res) => {
 });
 
 function handleClearCustomBackground(req, res) {
+  const backgrounds = eventBrandingStore.normalizeCustomBackgrounds(eventConfig);
+  for (const entry of backgrounds) {
+    if (canDeleteBackgroundFile(req, entry.url)) {
+      deleteStoredBackgroundFile(entry.url);
+    }
+  }
   if (req.user?.id) {
     clearUserBackgroundFiles(req.user.id);
   } else {
@@ -960,19 +982,16 @@ function handleDeleteCustomBackground(req, res) {
   }
   const target = eventBrandingStore.stripBackgroundUrlQuery(rawUrl);
   const backgrounds = eventBrandingStore.normalizeCustomBackgrounds(eventConfig);
-  if (!backgrounds.some((entry) => entry.url === target)) {
+  if (findBackgroundEntryIndex(backgrounds, target) < 0) {
     res.status(404).json({ error: "Background not found." });
     return;
   }
-  if (req.user?.id) {
-    const owned = target.includes(`/users/${req.user.id}/`);
-    if (!owned) {
-      res.status(403).json({ error: "You can only delete your own uploaded backgrounds." });
-      return;
-    }
+  if (canDeleteBackgroundFile(req, target)) {
+    deleteStoredBackgroundFile(target);
   }
-  deleteStoredBackgroundFile(target);
-  const remaining = backgrounds.filter((entry) => entry.url !== target);
+  const remaining = backgrounds.filter(
+    (entry) => eventBrandingStore.stripBackgroundUrlQuery(entry.url) !== target
+  );
   if (!remaining.length) {
     eventConfig.customBackgroundUrl = null;
     eventConfig.customBackgroundUrls = [];
@@ -994,6 +1013,8 @@ function handleDeleteCustomBackground(req, res) {
   res.json(payload);
 }
 app.post("/api/event-background/clear", handleClearCustomBackground);
+
+app.post("/api/event-background/remove", handleDeleteCustomBackground);
 
 app.delete("/api/event-background", (req, res) => {
   if (req.query?.url || req.body?.url) {
