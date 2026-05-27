@@ -524,23 +524,6 @@ app.use(compression());
 app.use(express.json({ limit: "12mb" }));
 app.use(cookieParser());
 app.use(authLib.attachUserMiddleware());
-app.use(express.static(path.join(__dirname, "public"), {
-  maxAge: IS_PRODUCTION ? "1h" : 0,
-  etag: true
-}));
-app.use("/flags", express.static(path.join(__dirname, "node_modules/flag-icons/flags/4x3"), {
-  maxAge: IS_PRODUCTION ? "7d" : 0
-}));
-app.use("/sponsor-shapes", express.static(sponsors.SPONSORS_DIR, {
-  maxAge: IS_PRODUCTION ? "1d" : 0
-}));
-app.use("/event-backgrounds", express.static(BACKGROUNDS_DIR, {
-  maxAge: 0,
-  etag: false,
-  setHeaders(res) {
-    res.setHeader("Cache-Control", "no-store");
-  }
-}));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -564,6 +547,14 @@ app.get("/mobile", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "mobile.html"));
 });
 
+app.get("/account", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "account.html"));
+});
+
+app.get("/admin", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
 app.get("/api/themes", (_req, res) => {
   res.json({
     patterns: themes.GAME_PATTERNS,
@@ -580,11 +571,19 @@ app.get("/api/event-branding", (_req, res) => {
   res.json(getEventPayload());
 });
 
+function setAuthSessionCookie(res, user) {
+  const token = authLib.signUserToken(user);
+  res.cookie(authLib.COOKIE_NAME, token, authLib.authCookieOptions());
+}
+
 app.post("/api/auth/register", async (req, res) => {
   try {
-    const emailRaw = req.body?.email;
-    const email = typeof emailRaw === "string" ? emailRaw.trim() : "";
+    const email = userStore.normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: "Please enter a valid email address." });
+      return;
+    }
     if (password.length < 8) {
       res.status(400).json({ error: "Password must be at least 8 characters." });
       return;
@@ -592,11 +591,12 @@ app.post("/api/auth/register", async (req, res) => {
     const passwordHash = await authLib.hashPassword(password);
     const user = userStore.createUser({ email, passwordHash });
     appendAudit({ userId: user.id, email: user.email, type: "auth.register", meta: {} });
-    const token = authLib.signUserToken(user);
-    res.cookie(authLib.COOKIE_NAME, token, authLib.authCookieOptions());
+    setAuthSessionCookie(res, user);
     res.status(201).json({ user: userStore.publicUser(user) });
   } catch (error) {
-    res.status(400).json({ error: error.message || "Could not register." });
+    const msg = error?.message || "Could not register.";
+    const status = /SESSION_SECRET/i.test(msg) ? 503 : 400;
+    res.status(status).json({ error: msg });
   }
 });
 
@@ -604,6 +604,14 @@ app.post("/api/auth/login", async (req, res) => {
   try {
     const email = userStore.normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
+    if (!email) {
+      res.status(400).json({ error: "Please enter your email address." });
+      return;
+    }
+    if (!password) {
+      res.status(400).json({ error: "Please enter your password." });
+      return;
+    }
     const user = userStore.findUserByEmail(email);
     const okPass = user && (await authLib.verifyPassword(password, user.passwordHash));
     if (!okPass) {
@@ -611,11 +619,12 @@ app.post("/api/auth/login", async (req, res) => {
       return;
     }
     appendAudit({ userId: user.id, email: user.email, type: "auth.login", meta: {} });
-    const token = authLib.signUserToken(user);
-    res.cookie(authLib.COOKIE_NAME, token, authLib.authCookieOptions());
+    setAuthSessionCookie(res, user);
     res.json({ user: userStore.publicUser(user) });
-  } catch (_error) {
-    res.status(400).json({ error: "Could not sign in." });
+  } catch (error) {
+    const msg = error?.message || "Could not sign in.";
+    const status = /SESSION_SECRET/i.test(msg) ? 503 : 400;
+    res.status(status).json({ error: msg });
   }
 });
 
@@ -1186,6 +1195,24 @@ function getLanAddresses() {
   }
   return [...new Set(addresses)];
 }
+
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: IS_PRODUCTION ? "1h" : 0,
+  etag: true
+}));
+app.use("/flags", express.static(path.join(__dirname, "node_modules/flag-icons/flags/4x3"), {
+  maxAge: IS_PRODUCTION ? "7d" : 0
+}));
+app.use("/sponsor-shapes", express.static(sponsors.SPONSORS_DIR, {
+  maxAge: IS_PRODUCTION ? "1d" : 0
+}));
+app.use("/event-backgrounds", express.static(BACKGROUNDS_DIR, {
+  maxAge: 0,
+  etag: false,
+  setHeaders(res) {
+    res.setHeader("Cache-Control", "no-store");
+  }
+}));
 
 app.use((err, _req, res, next) => {
   if (err instanceof multer.MulterError) {

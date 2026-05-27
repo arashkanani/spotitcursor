@@ -2998,3 +2998,204 @@ body[data-pattern="cinema"] .setup-preview-inner .circle {
     grid-template-columns: 1fr;
   }
 }
+
+/* ——— Account / sign-in page ——— */
+body.account-body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+}
+
+body.account-body .bg-mesh,
+body.account-body .bg-vignette {
+  z-index: 0;
+}
+
+body.account-body .bg-orb,
+body.account-body .bg-sparkle {
+  z-index: 0;
+}
+
+.account-page-wrap {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+}
+
+.account-card {
+  width: min(440px, 100%);
+  background: linear-gradient(155deg, rgba(22, 34, 62, 0.94), rgba(10, 16, 32, 0.92));
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 2rem 1.75rem;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px);
+}
+
+.account-card .event-eyebrow {
+  margin: 0 0 0.35rem;
+  text-align: center;
+}
+
+.account-card .account-title {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, #fff 0%, #c8d8ff 55%, var(--accent-gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.account-card .account-note {
+  margin: 0 0 1.35rem;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.account-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border-glass);
+}
+
+.account-tabs .tab {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.account-tabs .tab:hover:not(.is-active) {
+  color: var(--text-secondary);
+}
+
+.account-tabs .tab.is-active {
+  background: linear-gradient(135deg, rgba(92, 225, 230, 0.22), rgba(139, 124, 248, 0.28));
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(92, 225, 230, 0.25);
+}
+
+.account-form label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.account-form input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  background: rgba(6, 10, 22, 0.65);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.account-form input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.account-form input:focus {
+  outline: none;
+  border-color: rgba(92, 225, 230, 0.55);
+  box-shadow: 0 0 0 3px rgba(92, 225, 230, 0.18);
+}
+
+.account-form input:-webkit-autofill,
+.account-form input:-webkit-autofill:hover,
+.account-form input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px rgba(14, 22, 42, 0.95) inset;
+  box-shadow: 0 0 0 1000px rgba(14, 22, 42, 0.95) inset;
+  border-color: rgba(92, 225, 230, 0.4);
+}
+
+.account-form .submit-btn {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.85rem 1.25rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #061018;
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #7dd3fc 45%, var(--accent-gold) 100%);
+  box-shadow: 0 8px 28px rgba(92, 225, 230, 0.25);
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.account-form .submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(92, 225, 230, 0.35);
+}
+
+.account-form .submit-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.account-footer {
+  margin-top: 1.35rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--border-glass);
+  text-align: center;
+}
+
+.account-footer a {
+  color: var(--accent-cyan);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.account-footer a:hover {
+  text-decoration: underline;
+  color: #8ef0f3;
+}
+
+.account-alert {
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.account-alert.err {
+  background: rgba(244, 114, 182, 0.12);
+  border: 1px solid rgba(244, 114, 182, 0.35);
+  color: #ffc8e0;
+}
+
+.account-alert.ok {
+  background: rgba(92, 225, 230, 0.1);
+  border: 1px solid rgba(92, 225, 230, 0.35);
+  color: #b8f5f7;
+}

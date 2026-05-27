@@ -6,166 +6,177 @@
   <title>Sign in · Shape Match</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
-  <style>
-    .account-page { min-height: 100vh; display: grid; place-items: center; padding: 2rem; }
-    .account-card {
-      width: min(420px, 100%);
-      background: rgba(15, 18, 32, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 2rem;
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
-      font-family: Outfit, system-ui, sans-serif;
-      color: #e8eaf4;
-    }
-    .account-card h1 { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.35rem; }
-    .account-card p.note { opacity: 0.75; font-size: 0.9rem; margin-bottom: 1.25rem; }
-    .account-card label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.35rem; opacity: 0.9; }
-    .account-card input {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(0, 0, 0, 0.25);
-      color: inherit;
-      font: inherit;
-      margin-bottom: 1rem;
-      box-sizing: border-box;
-    }
-    .account-card .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
-    .account-card button.tab {
-      flex: 1;
-      padding: 0.5rem;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: transparent;
-      color: inherit;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 600;
-    }
-    .account-card button.tab.is-active { background: linear-gradient(120deg, #6c63ff, #9d4edd); border-color: transparent; }
-    .account-card button.submit {
-      width: 100%;
-      padding: 0.75rem;
-      margin-top: 0.25rem;
-      border: none;
-      border-radius: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      background: linear-gradient(120deg, #00c9a7, #4cc9f0);
-      color: #0b1020;
-    }
-    .account-card .footer { margin-top: 1.25rem; text-align: center; }
-    .account-card a.back { color: #9dd6ff; text-decoration: none; font-weight: 600; }
-    .account-card .err { background: rgba(255, 80, 100, 0.15); border: 1px solid rgba(255, 100, 120, 0.35); color: #ffb4c0; padding: 0.65rem; border-radius: 10px; margin-bottom: 1rem; font-size: 0.9rem; }
-    #registerPanel.hidden, #loginPanel.hidden { display: none; }
-  </style>
 </head>
-<body>
-  <div class="bg-mesh"></div>
-  <div class="bg-vignette"></div>
-  <div class="account-page">
-    <div class="account-card">
-      <h1>Shape Match accounts</h1>
-      <p class="note">Save event layouts across visits. Anyone can host without an account.</p>
+<body class="account-body">
+  <div class="bg-mesh" aria-hidden="true"></div>
+  <div class="bg-vignette" aria-hidden="true"></div>
+  <div class="bg-orb orb-1" aria-hidden="true"></div>
+  <div class="bg-orb orb-2" aria-hidden="true"></div>
+  <div class="bg-orb orb-3" aria-hidden="true"></div>
+  <div class="bg-sparkle" aria-hidden="true"></div>
 
-      <div class="tabs" role="tablist">
+  <div class="account-page-wrap">
+    <div class="account-card card">
+      <p class="event-eyebrow">Shape Match</p>
+      <h1 class="account-title">Sign in to your account</h1>
+      <p class="account-note">Save event layouts across visits. You can still host games without an account.</p>
+
+      <div class="account-tabs" role="tablist">
         <button type="button" class="tab is-active" data-panel="login" role="tab">Sign in</button>
         <button type="button" class="tab" data-panel="register" role="tab">Create account</button>
       </div>
 
-      <div id="formError" class="err hidden"></div>
+      <div id="formError" class="account-alert err hidden" role="alert"></div>
+      <div id="formOk" class="account-alert ok hidden" role="status"></div>
 
-      <div id="loginPanel">
+      <form id="loginForm" class="account-form" autocomplete="on">
         <label for="loginEmail">Email</label>
-        <input id="loginEmail" type="email" autocomplete="username">
+        <input id="loginEmail" name="email" type="email" required autocomplete="username" inputmode="email" placeholder="you@company.com">
 
         <label for="loginPassword">Password</label>
-        <input id="loginPassword" type="password" autocomplete="current-password">
+        <input id="loginPassword" name="password" type="password" required autocomplete="current-password" minlength="8" placeholder="Your password">
 
-        <button type="button" class="submit" id="loginBtn">Sign in</button>
-      </div>
+        <button type="submit" class="submit-btn" id="loginBtn">Sign in</button>
+      </form>
 
-      <div id="registerPanel" class="hidden">
+      <form id="registerForm" class="account-form hidden" autocomplete="on">
         <label for="regEmail">Email</label>
-        <input id="regEmail" type="email" autocomplete="username">
+        <input id="regEmail" name="email" type="email" required autocomplete="username" inputmode="email" placeholder="you@company.com">
 
-        <label for="regPassword">Password (min 8 characters)</label>
-        <input id="regPassword" type="password" autocomplete="new-password">
+        <label for="regPassword">Password</label>
+        <input id="regPassword" name="password" type="password" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
 
-        <button type="button" class="submit" id="registerBtn">Create account</button>
-      </div>
+        <button type="submit" class="submit-btn" id="registerBtn">Create account</button>
+      </form>
 
-      <div class="footer">
-        <a class="back" href="/">← Host screen</a>
+      <div class="account-footer">
+        <a href="/">← Back to host screen</a>
       </div>
     </div>
   </div>
+  <script src="/auth-client.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
-    const nextUrl = params.get("next") || "/";
-
-    const fetchSession = (url, opts = {}) =>
-      fetch(url, { credentials: "include", ...opts });
+    const nextUrl = ShapeMatchAuth.safeNextUrl(params.get("next"));
+    const formError = document.getElementById("formError");
+    const formOk = document.getElementById("formOk");
+    const loginForm = document.getElementById("loginForm");
+    const registerForm = document.getElementById("registerForm");
+    const loginBtn = document.getElementById("loginBtn");
+    const registerBtn = document.getElementById("registerBtn");
+    const accountTitle = document.querySelector(".account-title");
 
     function showErr(msg) {
-      const el = document.getElementById("formError");
       if (!msg) {
-        el.classList.add("hidden");
-        el.textContent = "";
+        formError.classList.add("hidden");
+        formError.textContent = "";
         return;
       }
-      el.textContent = msg;
-      el.classList.remove("hidden");
+      formOk.classList.add("hidden");
+      formError.textContent = msg;
+      formError.classList.remove("hidden");
     }
 
-    document.querySelectorAll(".tab").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const panel = btn.getAttribute("data-panel");
-        document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("is-active", b === btn));
-        document.getElementById("loginPanel").classList.toggle("hidden", panel !== "login");
-        document.getElementById("registerPanel").classList.toggle("hidden", panel !== "register");
-        showErr("");
-      });
-    });
-
-    document.getElementById("loginBtn").addEventListener("click", async () => {
-      showErr("");
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value;
-      const res = await fetchSession("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showErr(data.error || "Could not sign in.");
+    function showOk(msg) {
+      if (!msg) {
+        formOk.classList.add("hidden");
+        formOk.textContent = "";
         return;
       }
-      window.location.href = nextUrl;
+      formError.classList.add("hidden");
+      formOk.textContent = msg;
+      formOk.classList.remove("hidden");
+    }
+
+    function setPanel(panel) {
+      document.querySelectorAll(".account-tabs .tab").forEach((b) => {
+        b.classList.toggle("is-active", b.getAttribute("data-panel") === panel);
+      });
+      loginForm.classList.toggle("hidden", panel !== "login");
+      registerForm.classList.toggle("hidden", panel !== "register");
+      if (accountTitle) {
+        accountTitle.textContent = panel === "register" ? "Create your account" : "Sign in to your account";
+      }
+      showErr("");
+      showOk("");
+    }
+
+    document.querySelectorAll(".account-tabs .tab").forEach((btn) => {
+      btn.addEventListener("click", () => setPanel(btn.getAttribute("data-panel")));
     });
 
-    document.getElementById("registerBtn").addEventListener("click", async () => {
+    if (params.get("tab") === "register") {
+      setPanel("register");
+    }
+
+    loginForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
       showErr("");
-      const email = document.getElementById("regEmail").value.trim();
-      const password = document.getElementById("regPassword").value;
-      const res = await fetchSession("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showErr(data.error || "Could not register.");
+      showOk("");
+      const emailCheck = ShapeMatchAuth.validateEmail(loginForm.email.value);
+      if (!emailCheck.ok) {
+        showErr(emailCheck.message);
         return;
       }
-      window.location.href = nextUrl;
+      const passCheck = ShapeMatchAuth.validatePassword(loginForm.password.value);
+      if (!passCheck.ok) {
+        showErr(passCheck.message);
+        return;
+      }
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Signing in…";
+      try {
+        await ShapeMatchAuth.login(emailCheck.email, passCheck.password);
+        showOk("Signed in — redirecting…");
+        window.location.href = nextUrl;
+      } catch (err) {
+        showErr(err.message || "Could not sign in.");
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Sign in";
+      }
     });
+
+    registerForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      showErr("");
+      showOk("");
+      const emailCheck = ShapeMatchAuth.validateEmail(registerForm.email.value);
+      if (!emailCheck.ok) {
+        showErr(emailCheck.message);
+        return;
+      }
+      const passCheck = ShapeMatchAuth.validatePassword(registerForm.password.value);
+      if (!passCheck.ok) {
+        showErr(passCheck.message);
+        return;
+      }
+      registerBtn.disabled = true;
+      registerBtn.textContent = "Creating account…";
+      try {
+        await ShapeMatchAuth.register(emailCheck.email, passCheck.password);
+        showOk("Account created — redirecting…");
+        window.location.href = nextUrl;
+      } catch (err) {
+        showErr(err.message || "Could not register.");
+      } finally {
+        registerBtn.disabled = false;
+        registerBtn.textContent = "Create account";
+      }
+    });
+
+    ShapeMatchAuth.getSession()
+      .then((user) => {
+        if (user) {
+          showOk(`Already signed in as ${user.email}. Redirecting…`);
+          window.setTimeout(() => {
+            window.location.href = nextUrl;
+          }, 600);
+        }
+      })
+      .catch(() => {});
   </script>
 </body>
 </html>
