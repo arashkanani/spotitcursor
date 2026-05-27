@@ -48,89 +48,9 @@ const BACKGROUNDS_DIR = path.join(DATA_DIR, "backgrounds");
 fs.mkdirSync(BACKGROUNDS_DIR, { recursive: true });
 
 function backgroundFileExists(url) {
-  const filePath = eventBrandingStore.resolveBackgroundFilePath(url, BACKGROUNDS_DIR);
-  return filePath ? fs.existsSync(filePath) : false;
-}
-
-function userBackgroundsDir(userId) {
-  const dir = path.join(BACKGROUNDS_DIR, "users", userId);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function buildWorkspaceConfig() {
-  const backgrounds = eventBrandingStore.normalizeCustomBackgrounds(eventConfig);
-  return {
-    title: eventConfig.title || "",
-    sponsorId: eventConfig.sponsorId || null,
-    themePattern: eventConfig.themePattern,
-    themeBackground: eventConfig.themeBackground,
-    customBackgroundUrl: eventBrandingStore.primaryBackgroundUrl(backgrounds),
-    customBackgroundUrls: backgrounds.map((entry) => entry.url),
-    customBackgrounds: backgrounds,
-    circlesPanelTransparent: !!eventConfig.circlesPanelTransparent,
-    rankingPanelTransparent: !!eventConfig.rankingPanelTransparent
-  };
-}
-
-function persistUserWorkspace(req) {
-  if (!req?.user?.id) return;
-  try {
-    userStore.saveUserWorkspace(req.user.id, buildWorkspaceConfig());
-  } catch (err) {
-    console.warn("Could not persist user workspace:", err.message);
-  }
-}
-
-function applyWorkspaceToEvent(config) {
-  if (!config || typeof config !== "object") {
-    return getEventPayload();
-  }
-
-  const backgrounds = eventBrandingStore.normalizeCustomBackgrounds({
-    ...eventConfig,
-    customBackgrounds: config.customBackgrounds,
-    customBackgroundUrls: config.customBackgroundUrls,
-    customBackgroundUrl: config.customBackgroundUrl
-  }).filter((entry) => backgroundFileExists(entry.url));
-
-  if (config.themePattern && themes.isValidPattern(config.themePattern)) {
-    eventConfig.themePattern = config.themePattern;
-  }
-
-  if (config.themeBackground && themes.isValidBackground(config.themeBackground)) {
-    eventConfig.themeBackground = themes.resolveThemeBackgroundForStorage(config.themeBackground);
-  }
-
-  if (config.title) {
-    eventConfig.title = String(config.title).trim().slice(0, 80);
-  }
-
-  if (config.sponsorId) {
-    const sponsor = sponsors.getSponsorById(config.sponsorId);
-    if (sponsor) {
-      eventConfig.sponsorId = sponsor.id;
-      eventConfig.sponsorName = sponsor.name;
-      sponsors.setActiveSponsorId(sponsor.id);
-    }
-  }
-
-  eventConfig.customBackgrounds = backgrounds;
-  eventConfig.customBackgroundUrls = backgrounds.map((entry) => entry.url);
-  eventConfig.customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(backgrounds);
-  Object.assign(eventConfig, eventBrandingStore.primaryBackgroundTransform(backgrounds));
-
-  if (config.circlesPanelTransparent !== undefined) {
-    eventConfig.circlesPanelTransparent = !!config.circlesPanelTransparent;
-  }
-  if (config.rankingPanelTransparent !== undefined) {
-    eventConfig.rankingPanelTransparent = !!config.rankingPanelTransparent;
-  }
-
-  eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
-  const payload = getEventPayload();
-  io.emit("eventBranding", payload);
-  return payload;
+  const filename = eventBrandingStore.backgroundFilenameFromUrl(url);
+  if (!filename) return false;
+  return fs.existsSync(path.join(BACKGROUNDS_DIR, filename));
 }
 
 function repairEventConfig(config) {
@@ -174,13 +94,7 @@ function newBackgroundFilename(originalName) {
 
 const backgroundUpload = multer({
   storage: multer.diskStorage({
-    destination: (req, _file, cb) => {
-      if (req.user?.id) {
-        cb(null, userBackgroundsDir(req.user.id));
-        return;
-      }
-      cb(null, BACKGROUNDS_DIR);
-    },
+    destination: (_req, _file, cb) => cb(null, BACKGROUNDS_DIR),
     filename: (_req, file, cb) => {
       cb(null, newBackgroundFilename(file.originalname));
     }
@@ -449,8 +363,6 @@ function commitFullEventBrandingFromBody(body, req) {
     type: "event.put_branding",
     meta: { title: title.slice(0, 60), sponsorId: sponsor.id }
   });
-
-  persistUserWorkspace(req);
 
   return { payload };
 }
@@ -730,26 +642,6 @@ app.get("/api/auth/me", (req, res) => {
   res.json({ user: req.user });
 });
 
-app.get("/api/account/workspace", authLib.requireAuth, (req, res) => {
-  const workspace = userStore.getUserWorkspace(req.user.id);
-  res.json({
-    workspace: workspace
-      ? { config: workspace.config, updatedAt: workspace.updatedAt }
-      : null
-  });
-});
-
-app.post("/api/account/workspace/apply", authLib.requireAuth, (req, res) => {
-  const workspace = userStore.getUserWorkspace(req.user.id);
-  if (!workspace?.config) {
-    res.json(getEventPayload());
-    return;
-  }
-  const payload = applyWorkspaceToEvent(workspace.config);
-  appendAudit({ req, type: "workspace.apply", meta: {} });
-  res.json(payload);
-});
-
 app.get("/api/dashboards", authLib.requireAuth, (req, res) => {
   res.json({ dashboards: userStore.listDashboards(req.user.id) });
 });
@@ -763,7 +655,6 @@ app.post("/api/dashboards", authLib.requireAuth, (req, res) => {
       return;
     }
     const entry = userStore.saveDashboard(req.user.id, name, config);
-    userStore.saveUserWorkspace(req.user.id, config);
     appendAudit({ req, type: "dashboard.save", meta: { name: entry.name, id: entry.id } });
     res.status(201).json({
       dashboard: { id: entry.id, name: entry.name, updatedAt: entry.updatedAt }
@@ -817,7 +708,6 @@ function clearStoredCustomBackgroundFiles(keepFilenames = []) {
   if (!fs.existsSync(BACKGROUNDS_DIR)) return;
   const keep = new Set(Array.isArray(keepFilenames) ? keepFilenames : [keepFilenames].filter(Boolean));
   for (const file of fs.readdirSync(BACKGROUNDS_DIR)) {
-    if (file === "users") continue;
     if (!isStoredBackgroundFile(file)) continue;
     if (keep.has(file)) continue;
     try {
@@ -829,23 +719,12 @@ function clearStoredCustomBackgroundFiles(keepFilenames = []) {
 }
 
 function deleteStoredBackgroundFile(url) {
-  const filePath = eventBrandingStore.resolveBackgroundFilePath(url, BACKGROUNDS_DIR);
-  if (!filePath || !fs.existsSync(filePath)) return false;
+  const filename = eventBrandingStore.backgroundFilenameFromUrl(url);
+  if (!filename) return false;
+  const filePath = path.join(BACKGROUNDS_DIR, filename);
+  if (!fs.existsSync(filePath)) return false;
   fs.unlinkSync(filePath);
   return true;
-}
-
-function clearUserBackgroundFiles(userId) {
-  const dir = path.join(BACKGROUNDS_DIR, "users", userId);
-  if (!fs.existsSync(dir)) return;
-  for (const file of fs.readdirSync(dir)) {
-    if (!isStoredBackgroundFile(file)) continue;
-    try {
-      fs.unlinkSync(path.join(dir, file));
-    } catch (_error) {
-      // Ignore delete errors.
-    }
-  }
 }
 
 function appendCustomBackgroundUrl(url) {
@@ -928,16 +807,11 @@ app.patch("/api/event-branding/theme", (req, res) => {
     type: "event.patch_theme",
     meta: { backgroundCount: eventConfig.customBackgrounds?.length || 0 }
   });
-  persistUserWorkspace(req);
   res.json(payload);
 });
 
 function handleClearCustomBackground(req, res) {
-  if (req.user?.id) {
-    clearUserBackgroundFiles(req.user.id);
-  } else {
-    clearStoredCustomBackgroundFiles();
-  }
+  clearStoredCustomBackgroundFiles();
   eventConfig.customBackgroundUrl = null;
   eventConfig.customBackgroundUrls = [];
   eventConfig.customBackgrounds = [];
@@ -948,7 +822,6 @@ function handleClearCustomBackground(req, res) {
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
   appendAudit({ req, type: "event.background_clear_all", meta: {} });
-  persistUserWorkspace(req);
   res.json(payload);
 }
 
@@ -963,13 +836,6 @@ function handleDeleteCustomBackground(req, res) {
   if (!backgrounds.some((entry) => entry.url === target)) {
     res.status(404).json({ error: "Background not found." });
     return;
-  }
-  if (req.user?.id) {
-    const owned = target.includes(`/users/${req.user.id}/`);
-    if (!owned) {
-      res.status(403).json({ error: "You can only delete your own uploaded backgrounds." });
-      return;
-    }
   }
   deleteStoredBackgroundFile(target);
   const remaining = backgrounds.filter((entry) => entry.url !== target);
@@ -990,11 +856,8 @@ function handleDeleteCustomBackground(req, res) {
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
   appendAudit({ req, type: "event.delete_background", meta: { url: target } });
-  persistUserWorkspace(req);
   res.json(payload);
 }
-app.post("/api/event-background/clear", handleClearCustomBackground);
-
 app.delete("/api/event-background", (req, res) => {
   if (req.query?.url || req.body?.url) {
     handleDeleteCustomBackground(req, res);
@@ -1009,19 +872,16 @@ app.post("/api/event-background", backgroundUpload.single("background"), (req, r
       res.status(400).json({ error: "Upload a JPG, PNG, or WebP image." });
       return;
     }
-    const url = req.user?.id
-      ? `/event-backgrounds/users/${req.user.id}/${req.file.filename}`
-      : `/event-backgrounds/${req.file.filename}`;
+    const url = `/event-backgrounds/${req.file.filename}`;
     eventConfig = appendCustomBackgroundUrl(url);
     const payload = getEventPayload();
     io.emit("eventBranding", payload);
     appendAudit({
       req,
       type: "event.upload_background",
-      meta: { filename: req.file.filename, userId: req.user?.id || null }
+      meta: { filename: req.file.filename }
     });
-    persistUserWorkspace(req);
-    res.json({ ...payload, savedToAccount: !!req.user?.id });
+    res.json(payload);
   } catch (error) {
     res.status(400).json({ error: error.message || "Could not save background." });
   }

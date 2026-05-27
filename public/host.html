@@ -36,10 +36,7 @@
           <div class="setup-section saved-dashboards-section">
             <h3 class="setup-section-title">Saved dashboards</h3>
             <p id="savedDashboardsHint" class="setup-hint">
-              Sign in (top right) to automatically save your backgrounds, position/zoom adjustments, and event layout to your account.
-            </p>
-            <p id="accountAutoSaveHint" class="setup-hint account-auto-save-hint hidden">
-              Your uploads and adjustments are saved to your account automatically when you change them.
+              Sign in (top right) to save this event layout and load it on your next visit.
             </p>
             <div id="savedDashboardsControls" class="saved-dashboards-controls hidden">
               <div class="dashboard-name-field">
@@ -436,7 +433,6 @@
     let sessionUser = null;
     const hostAccountSummary = document.getElementById("hostAccountSummary");
     const savedDashboardsHint = document.getElementById("savedDashboardsHint");
-    const accountAutoSaveHint = document.getElementById("accountAutoSaveHint");
     const savedDashboardsControls = document.getElementById("savedDashboardsControls");
     const dashboardNameInput = document.getElementById("dashboardNameInput");
     const dashboardSaveBtn = document.getElementById("dashboardSaveBtn");
@@ -731,7 +727,6 @@
           '">Sign in</a> to save dashboards.</span>';
         savedDashboardsControls?.classList.add("hidden");
         savedDashboardsHint?.classList.remove("hidden");
-        accountAutoSaveHint?.classList.add("hidden");
         return;
       }
       const adminLink =
@@ -746,27 +741,7 @@
         ' · <button type="button" class="host-account-linkish" id="hostSignOutBtn">Sign out</button>';
       savedDashboardsControls?.classList.remove("hidden");
       savedDashboardsHint?.classList.add("hidden");
-      accountAutoSaveHint?.classList.remove("hidden");
       await refreshDashboardList();
-    }
-
-    async function loadUserWorkspace() {
-      if (!sessionUser) return;
-      try {
-        const res = await fetch("/api/account/workspace/apply", { method: "POST" });
-        const data = await parseApiJson(res);
-        if (!res.ok) return;
-        applyEventBranding(data);
-        await loadSponsorCatalog();
-        updateChosenSponsorBar();
-        renderCustomBackgroundList();
-        refreshAdBackgroundPlayback();
-        if (setupPhase === "customize") {
-          refreshDashboardPreview();
-        }
-      } catch (_err) {
-        // Workspace may not exist yet for new accounts.
-      }
     }
 
     async function refreshDashboardList() {
@@ -2226,9 +2201,6 @@
         if (!addBackgroundFromUploadResponse(lastData)) {
           throw new Error(staleServerUploadMessage());
         }
-        if (lastData.savedToAccount && customBackgroundStatus) {
-          customBackgroundStatus.textContent = "Saved to your account.";
-        }
         try {
           applyGameTheme(FIXED_THEME_PATTERN, getPresetThemeBackground(), undefined, previewBgCacheVersion);
         } catch (themeErr) {
@@ -2645,25 +2617,14 @@
         };
         initThemePicker();
         applyEventBranding(branding);
+        if (canOpenLobby(branding)) {
+          showLobbyView();
+        } else {
+          openEventDashboard();
+        }
         refreshAccountUi()
-          .then(async () => {
-            if (sessionUser) {
-              await loadUserWorkspace();
-              openEventDashboard();
-            } else if (canOpenLobby(branding)) {
-              showLobbyView();
-            } else {
-              openEventDashboard();
-            }
-            await refreshDashboardList();
-          })
-          .catch(() => {
-            if (canOpenLobby(branding)) {
-              showLobbyView();
-            } else {
-              openEventDashboard();
-            }
-          });
+          .then(() => refreshDashboardList())
+          .catch(() => {});
       })
       .catch(() => {
         themeCatalog = { backgrounds: [], presets: [] };
