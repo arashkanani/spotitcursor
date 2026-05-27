@@ -1652,7 +1652,7 @@
         return JSON.parse(text);
       } catch (_err) {
         if (text.trimStart().startsWith("<")) {
-          throw new Error("API returned HTML instead of JSON. Server may be on an older build — redeploy and hard-refresh (Ctrl+Shift+R).");
+          throw new Error("Clear API not found on server — redeploy, or click a color preset.");
         }
         throw new Error("Invalid server response.");
       }
@@ -2644,7 +2644,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, config: collectDashboardConfig() })
           });
-          const data = await parseApiJson(res);
+          const data = await res.json();
           if (!res.ok) {
             setupMessage.textContent = data.error || "Could not save dashboard.";
             return;
@@ -2673,7 +2673,7 @@
           const res = await fetch(`/api/dashboards/${encodeURIComponent(id)}/apply`, {
             method: "POST"
           });
-          const data = await parseApiJson(res);
+          const data = await res.json();
           if (!res.ok) {
             setupMessage.textContent = data.error || "Could not apply dashboard.";
             return;
@@ -2705,9 +2705,8 @@
         const res = await fetch(`/api/dashboards/${encodeURIComponent(id)}`, {
           method: "DELETE"
         });
-        const data = await parseApiJson(res);
         if (!res.ok) {
-          setupMessage.textContent = data.error || "Could not delete dashboard.";
+          setupMessage.textContent = "Could not delete dashboard.";
           return;
         }
         await refreshDashboardList();
