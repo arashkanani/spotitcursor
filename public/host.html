@@ -639,11 +639,10 @@
         });
       };
 
-      if (Array.isArray(branding?.customBackgrounds) && branding.customBackgrounds.length > 0) {
+      if (Array.isArray(branding?.customBackgrounds)) {
         for (const item of branding.customBackgrounds) {
           addEntry(item?.url, item?.posX, item?.posY, item?.scale);
         }
-        return entries;
       }
       if (Array.isArray(branding?.customBackgroundUrls)) {
         for (const raw of branding.customBackgroundUrls) {
@@ -723,46 +722,17 @@
     }
 
     function collectDashboardConfig() {
-      const selected = stripBackgroundUrlQuery(selectedBackgroundUrl || customBackgroundUrl);
       return {
         title: eventTitleInput ? eventTitleInput.value.trim() : "",
         sponsorId: selectedSponsorId,
         themePattern: selectedThemePattern,
         themeBackground: getPresetThemeBackground(),
-        customBackgroundUrl: selected || null,
+        customBackgroundUrl: customBackgroundUrl || null,
         customBackgroundUrls: [...customBackgroundUrls],
-        selectedBackgroundUrl: selected,
         ...getBackgroundTransformPayload(),
         circlesPanelTransparent,
         rankingPanelTransparent
       };
-    }
-
-    function applyBrandingVisualState(branding) {
-      if (branding?.updatedAt) {
-        previewBgCacheVersion = branding.updatedAt;
-      }
-      const preferred = stripBackgroundUrlQuery(
-        branding?.selectedBackgroundUrl || branding?.customBackgroundUrl
-      );
-      if (
-        preferred
-        && customBackgrounds.some(
-          (entry) => stripBackgroundUrlQuery(entry.url) === preferred
-        )
-      ) {
-        selectedBackgroundUrl = preferred;
-        customBackgroundUrl = preferred;
-      }
-      syncLegacyTransformFromEntry(getSelectedBackgroundEntry());
-      const entry = getSelectedBackgroundEntry();
-      if (entry) {
-        syncMainAdjustPanelOutputs(entry);
-        syncMainAdjustPanelHint(entry);
-      }
-      updateCustomBackgroundAdjustPanel();
-      applyCustomBackgroundTransform();
-      updateSetupPreview();
     }
 
     async function refreshAccountUi() {
@@ -807,10 +777,15 @@
         const data = await parseApiJson(res);
         if (!res.ok) return;
         applyEventBranding(data);
-        applyBrandingVisualState(data);
         await loadSponsorCatalog();
         updateChosenSponsorBar();
         renderCustomBackgroundList();
+        const entry = getSelectedBackgroundEntry();
+        if (entry) {
+          syncMainAdjustPanelOutputs(entry);
+          syncMainAdjustPanelHint(entry);
+        }
+        updateCustomBackgroundAdjustPanel();
         refreshAdBackgroundPlayback();
         if (setupPhase === "customize") {
           refreshDashboardPreview();
@@ -1929,7 +1904,6 @@
       });
       renderSponsorGrid();
       updateChosenSponsorBar();
-      applyBrandingVisualState(branding);
       if (setupPhase === "customize") refreshDashboardPreview();
     }
 
@@ -2679,7 +2653,6 @@
             return;
           }
           applyEventBranding(data);
-          applyBrandingVisualState(data);
           await loadSponsorCatalog();
           updateChosenSponsorBar();
           renderCustomBackgroundList();
