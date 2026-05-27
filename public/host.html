@@ -692,13 +692,33 @@
 
     function getBackgroundTransformPayload() {
       return {
-        customBackgrounds: customBackgrounds.map((entry) => ({
-          url: entry.url,
-          posX: entry.posX,
-          posY: entry.posY,
-          scale: entry.scale
-        }))
+        customBackgrounds: customBackgrounds
+          .filter((entry) => entry?.url && !String(entry.url).startsWith("blob:"))
+          .map((entry) => ({
+            url: stripBackgroundUrlQuery(entry.url),
+            posX: clampBgPercent(entry.posX, 50),
+            posY: clampBgPercent(entry.posY, 50),
+            scale: clampBgScale(entry.scale, 100)
+          }))
       };
+    }
+
+    let accountSaveStatusTimer = null;
+
+    function showAccountSavedStatus(message) {
+      if (!sessionUser) return;
+      if (accountAutoSaveHint) {
+        accountAutoSaveHint.textContent = message || "Saved to your account.";
+        accountAutoSaveHint.classList.remove("hidden");
+      }
+      if (accountSaveStatusTimer) clearTimeout(accountSaveStatusTimer);
+      accountSaveStatusTimer = setTimeout(() => {
+        accountSaveStatusTimer = null;
+        if (accountAutoSaveHint && sessionUser) {
+          accountAutoSaveHint.textContent =
+            "Your uploads and adjustments are saved to your account automatically when you change them.";
+        }
+      }, 2500);
     }
 
     function collectDashboardConfig() {
@@ -760,6 +780,12 @@
         await loadSponsorCatalog();
         updateChosenSponsorBar();
         renderCustomBackgroundList();
+        const entry = getSelectedBackgroundEntry();
+        if (entry) {
+          syncMainAdjustPanelOutputs(entry);
+          syncMainAdjustPanelHint(entry);
+        }
+        updateCustomBackgroundAdjustPanel();
         refreshAdBackgroundPlayback();
         if (setupPhase === "customize") {
           refreshDashboardPreview();
@@ -949,6 +975,9 @@
       bgPosXInput?.addEventListener("input", onSliderInput);
       bgPosYInput?.addEventListener("input", onSliderInput);
       bgScaleInput?.addEventListener("input", onSliderInput);
+      bgPosXInput?.addEventListener("change", () => void persistAccountSettings());
+      bgPosYInput?.addEventListener("change", () => void persistAccountSettings());
+      bgScaleInput?.addEventListener("change", () => void persistAccountSettings());
 
       resetBgAdjustBtn?.addEventListener("click", () => {
         const entry = getSelectedBackgroundEntry();
@@ -959,7 +988,7 @@
         paintAllCustomBackgroundMeshes(previewBgCacheVersion);
         applyCustomBackgroundTransform();
         refreshAdBackgroundPlayback();
-        schedulePersistCustomBackgrounds();
+        void persistAccountSettings();
       });
     }
 
@@ -1380,8 +1409,35 @@
       if (bgAdjustPersistTimer) clearTimeout(bgAdjustPersistTimer);
       bgAdjustPersistTimer = setTimeout(() => {
         bgAdjustPersistTimer = null;
-        void persistThemeSelection();
-      }, 400);
+        void persistAccountSettings();
+      }, 350);
+    }
+
+    async function persistAccountSettings() {
+      const config = collectDashboardConfig();
+      try {
+        if (sessionUser) {
+          const res = await fetch("/api/account/workspace/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(config)
+          });
+          const data = await parseApiJson(res);
+          if (!res.ok) {
+            throw new Error(data.error || "Could not save to your account.");
+          }
+          previewBgCacheVersion = data.updatedAt || previewBgCacheVersion;
+          showAccountSavedStatus("Position & zoom saved to your account.");
+        } else {
+          await persistThemeSelection();
+        }
+      } catch (err) {
+        if (sessionUser && customBackgroundStatus) {
+          customBackgroundStatus.textContent = err.message || "Could not save adjustments.";
+        } else {
+          await persistThemeSelection();
+        }
+      }
     }
 
     async function removeCustomBackgroundByUrl(url) {
@@ -1751,7 +1807,7 @@
         btn.addEventListener("click", async () => {
           applyGameTheme(selectedThemePattern, bg.id, null);
           if (customBackgroundStatus) customBackgroundStatus.textContent = "";
-          await persistThemeSelection();
+          await persistAccountSettings();
           updateSetupPreview();
           refreshDashboardPreview();
         });
@@ -2383,14 +2439,14 @@
       circlesPanelTransparent = circlesPanelTransparentInput.checked;
       syncPanelStyleAttributes();
       updateSetupPreview();
-      void persistThemeSelection();
+      void persistAccountSettings();
     });
 
     rankingPanelTransparentInput?.addEventListener("change", () => {
       rankingPanelTransparent = rankingPanelTransparentInput.checked;
       syncPanelStyleAttributes();
       updateSetupPreview();
-      void persistThemeSelection();
+      void persistAccountSettings();
     });
 
     function showSetupView() {

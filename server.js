@@ -82,52 +82,83 @@ function persistUserWorkspace(req) {
   }
 }
 
+/** Build workspace config from API body + current event state. */
+function workspaceConfigFromBody(body = {}) {
+  const backgrounds = Array.isArray(body.customBackgrounds)
+    ? eventBrandingStore.normalizeCustomBackgrounds({
+      ...eventConfig,
+      customBackgrounds: body.customBackgrounds,
+      customBackgroundUrls: body.customBackgroundUrls,
+      customBackgroundUrl: body.customBackgroundUrl
+    })
+    : eventBrandingStore.normalizeCustomBackgrounds(eventConfig);
+
+  const themePattern = body.themePattern && themes.isValidPattern(body.themePattern)
+    ? body.themePattern
+    : eventConfig.themePattern;
+  const themeBackground = body.themeBackground && themes.isValidBackground(body.themeBackground)
+    ? themes.resolveThemeBackgroundForStorage(body.themeBackground)
+    : eventConfig.themeBackground;
+
+  let sponsorId = eventConfig.sponsorId;
+  let sponsorName = eventConfig.sponsorName;
+  if (body.sponsorId) {
+    const sponsor = sponsors.getSponsorById(String(body.sponsorId).trim());
+    if (sponsor) {
+      sponsorId = sponsor.id;
+      sponsorName = sponsor.name;
+    }
+  }
+
+  return {
+    title: body.title !== undefined
+      ? String(body.title || "").trim().slice(0, 80)
+      : (eventConfig.title || ""),
+    sponsorId,
+    sponsorName,
+    themePattern,
+    themeBackground,
+    customBackgroundUrl: eventBrandingStore.primaryBackgroundUrl(backgrounds),
+    customBackgroundUrls: backgrounds.map((entry) => entry.url),
+    customBackgrounds: backgrounds,
+    circlesPanelTransparent: body.circlesPanelTransparent !== undefined
+      ? !!body.circlesPanelTransparent
+      : !!eventConfig.circlesPanelTransparent,
+    rankingPanelTransparent: body.rankingPanelTransparent !== undefined
+      ? !!body.rankingPanelTransparent
+      : !!eventConfig.rankingPanelTransparent
+  };
+}
+
+function applyWorkspaceConfigToEvent(config) {
+  const saved = workspaceConfigFromBody(config);
+  eventConfig = eventBrandingStore.writeEventConfig({
+    ...eventConfig,
+    title: saved.title,
+    sponsorId: saved.sponsorId,
+    sponsorName: saved.sponsorName,
+    themePattern: saved.themePattern,
+    themeBackground: saved.themeBackground,
+    customBackgroundUrl: saved.customBackgroundUrl,
+    customBackgroundUrls: saved.customBackgroundUrls,
+    customBackgrounds: saved.customBackgrounds.filter((entry) => backgroundFileExists(entry.url)),
+    ...eventBrandingStore.primaryBackgroundTransform(
+      saved.customBackgrounds.filter((entry) => backgroundFileExists(entry.url))
+    ),
+    circlesPanelTransparent: saved.circlesPanelTransparent,
+    rankingPanelTransparent: saved.rankingPanelTransparent
+  });
+  if (saved.sponsorId) {
+    sponsors.setActiveSponsorId(saved.sponsorId);
+  }
+  return saved;
+}
+
 function applyWorkspaceToEvent(config) {
   if (!config || typeof config !== "object") {
     return getEventPayload();
   }
-
-  const backgrounds = eventBrandingStore.normalizeCustomBackgrounds({
-    ...eventConfig,
-    customBackgrounds: config.customBackgrounds,
-    customBackgroundUrls: config.customBackgroundUrls,
-    customBackgroundUrl: config.customBackgroundUrl
-  }).filter((entry) => backgroundFileExists(entry.url));
-
-  if (config.themePattern && themes.isValidPattern(config.themePattern)) {
-    eventConfig.themePattern = config.themePattern;
-  }
-
-  if (config.themeBackground && themes.isValidBackground(config.themeBackground)) {
-    eventConfig.themeBackground = themes.resolveThemeBackgroundForStorage(config.themeBackground);
-  }
-
-  if (config.title) {
-    eventConfig.title = String(config.title).trim().slice(0, 80);
-  }
-
-  if (config.sponsorId) {
-    const sponsor = sponsors.getSponsorById(config.sponsorId);
-    if (sponsor) {
-      eventConfig.sponsorId = sponsor.id;
-      eventConfig.sponsorName = sponsor.name;
-      sponsors.setActiveSponsorId(sponsor.id);
-    }
-  }
-
-  eventConfig.customBackgrounds = backgrounds;
-  eventConfig.customBackgroundUrls = backgrounds.map((entry) => entry.url);
-  eventConfig.customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(backgrounds);
-  Object.assign(eventConfig, eventBrandingStore.primaryBackgroundTransform(backgrounds));
-
-  if (config.circlesPanelTransparent !== undefined) {
-    eventConfig.circlesPanelTransparent = !!config.circlesPanelTransparent;
-  }
-  if (config.rankingPanelTransparent !== undefined) {
-    eventConfig.rankingPanelTransparent = !!config.rankingPanelTransparent;
-  }
-
-  eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
+  applyWorkspaceConfigToEvent(config);
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
   return payload;
@@ -750,6 +781,31 @@ app.post("/api/account/workspace/apply", authLib.requireAuth, (req, res) => {
   res.json(payload);
 });
 
+app.post("/api/account/workspace/sync", authLib.requireAuth, (req, res) => {
+  try {
+    const saved = applyWorkspaceConfigToEvent(req.body || {});
+    userStore.saveUserWorkspace(req.user.id, saved);
+    const payload = getEventPayload();
+    io.emit("eventBranding", payload);
+    appendAudit({
+      req,
+      type: "workspace.sync",
+      meta: {
+        backgroundCount: saved.customBackgrounds?.length || 0,
+        backgrounds: (saved.customBackgrounds || []).map((e) => ({
+          url: e.url,
+          posX: e.posX,
+          posY: e.posY,
+          scale: e.scale
+        }))
+      }
+    });
+    res.json({ ...payload, workspaceSaved: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Could not save account settings." });
+  }
+});
+
 app.get("/api/dashboards", authLib.requireAuth, (req, res) => {
   res.json({ dashboards: userStore.listDashboards(req.user.id) });
 });
@@ -897,9 +953,21 @@ app.patch("/api/event-branding/theme", (req, res) => {
   }
 
   if (Array.isArray(req.body?.customBackgrounds)) {
+    const incoming = req.body.customBackgrounds.map((item) => {
+      if (typeof item === "string") {
+        return { url: eventBrandingStore.stripBackgroundUrlQuery(item) };
+      }
+      if (item && typeof item === "object") {
+        return {
+          ...item,
+          url: eventBrandingStore.stripBackgroundUrlQuery(item.url)
+        };
+      }
+      return item;
+    });
     eventConfig.customBackgrounds = eventBrandingStore.normalizeCustomBackgrounds({
       ...eventConfig,
-      customBackgrounds: req.body.customBackgrounds
+      customBackgrounds: incoming
     });
     eventConfig.customBackgroundUrls = eventConfig.customBackgrounds.map((entry) => entry.url);
     eventConfig.customBackgroundUrl = eventBrandingStore.primaryBackgroundUrl(eventConfig.customBackgrounds);
