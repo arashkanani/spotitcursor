@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/styles.css">
   <script src="/player-ui.js"></script>
   <script src="/ad-background-slideshow.js"></script>
+  <script src="/auth-client.js"></script>
 </head>
 <body>
   <div class="bg-mesh"></div>
@@ -20,6 +21,9 @@
   <div class="bg-orb orb-3"></div>
   <div class="bg-sparkle"></div>
   <div class="page">
+    <header class="host-top-bar">
+      <div id="hostAccountSummary" class="host-account-summary" aria-live="polite"></div>
+    </header>
     <section id="setupView" class="host-setup">
       <div class="setup-card card">
         <div id="eventCustomizePanel" class="event-customize-panel">
@@ -323,6 +327,43 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    const hostAccountSummary = document.getElementById("hostAccountSummary");
+    let sessionUser = null;
+
+    async function refreshAccountUi() {
+      if (!hostAccountSummary || typeof ShapeMatchAuth === "undefined") return;
+      try {
+        sessionUser = await ShapeMatchAuth.getSession();
+      } catch (_err) {
+        sessionUser = null;
+      }
+      if (!sessionUser) {
+        hostAccountSummary.innerHTML =
+          '<span class="host-account-signed-out">Host freely as a guest — <a href="/account?next=' +
+          encodeURIComponent("/") +
+          '">Sign in</a> with Google or email.</span>';
+        return;
+      }
+      const safeEmail = escapeHtml(sessionUser.email);
+      hostAccountSummary.innerHTML =
+        '<span class="host-account-signed-in">' +
+        safeEmail +
+        '</span> · <button type="button" class="host-account-linkish" id="hostSignOutBtn">Sign out</button>';
+    }
+
+    if (hostAccountSummary) {
+      hostAccountSummary.addEventListener("click", async (ev) => {
+        if (!ev.target || ev.target.id !== "hostSignOutBtn") return;
+        try {
+          await ShapeMatchAuth.logout();
+        } catch (_err) {
+          // ignore
+        }
+        sessionUser = null;
+        refreshAccountUi();
+      });
+      refreshAccountUi();
+    }
     const setupView = document.getElementById("setupView");
     const lobbyView = document.getElementById("lobbyView");
     const gameView = document.getElementById("gameView");

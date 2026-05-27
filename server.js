@@ -3,6 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const crypto = require("crypto");
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const compression = require("compression");
 const multer = require("multer");
 const { createServer } = require("http");
@@ -12,6 +13,9 @@ const sponsors = require("./lib/sponsors");
 const eventBrandingStore = require("./lib/event-branding");
 const themes = require("./lib/themes");
 const { PORT, IS_PRODUCTION, PUBLIC_URL, MAX_PLAYERS, ROUND_TIMEOUT_MS } = require("./lib/config");
+const userStore = require("./lib/user-store");
+const authLib = require("./lib/auth");
+const googleAuth = require("./lib/google-auth");
 
 const app = express();
 const httpServer = createServer(app);
@@ -431,6 +435,8 @@ function resetSession() {
 
 app.use(compression());
 app.use(express.json({ limit: "12mb" }));
+app.use(cookieParser());
+app.use(authLib.attachUserMiddleware());
 app.use(express.static(path.join(__dirname, "public"), {
   maxAge: IS_PRODUCTION ? "1h" : 0,
   etag: true
@@ -456,7 +462,9 @@ app.get("/health", (_req, res) => {
     maxPlayers: MAX_PLAYERS,
     uptime: Math.floor(process.uptime()),
     features: {
-      multiCustomBackgrounds: true
+      multiCustomBackgrounds: true,
+      accounts: true,
+      googleSignIn: Boolean(googleAuth.getGoogleClientId())
     }
   });
 });
@@ -467,6 +475,86 @@ app.get("/", (_req, res) => {
 
 app.get("/mobile", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "mobile.html"));
+});
+
+app.get("/account", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "account.html"));
+});
+
+app.get("/api/auth/config", (_req, res) => {
+  res.json({
+    googleClientId: googleAuth.getGoogleClientId()
+  });
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const email = userStore.normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    if (!email) {
+      res.status(400).json({ error: "Email is required." });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters." });
+      return;
+    }
+    const passwordHash = await authLib.hashPassword(password);
+    const user = userStore.createUser({ email, passwordHash });
+    const publicUser = authLib.setAuthSession(res, user);
+    res.status(201).json({ user: publicUser });
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Could not register." });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const email = userStore.normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    const user = userStore.findUserByEmail(email);
+    if (!user?.passwordHash) {
+      res.status(401).json({ error: "Incorrect email or password." });
+      return;
+    }
+    const okPass = await authLib.verifyPassword(password, user.passwordHash);
+    if (!okPass) {
+      res.status(401).json({ error: "Incorrect email or password." });
+      return;
+    }
+    const publicUser = authLib.setAuthSession(res, user);
+    res.json({ user: publicUser });
+  } catch (_error) {
+    res.status(400).json({ error: "Could not sign in." });
+  }
+});
+
+app.post("/api/auth/google", async (req, res) => {
+  try {
+    const profile = await googleAuth.verifyGoogleIdToken(req.body?.credential);
+    const user = userStore.findOrCreateGoogleUser({
+      googleId: profile.googleId,
+      email: profile.email
+    });
+    const publicUser = authLib.setAuthSession(res, user);
+    res.json({ user: publicUser });
+  } catch (error) {
+    const status = /not configured/i.test(error.message) ? 503 : 400;
+    res.status(status).json({ error: error.message || "Google sign-in failed." });
+  }
+});
+
+app.post("/api/auth/logout", (_req, res) => {
+  authLib.clearAuthCookie(res);
+  res.json({ ok: true });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  if (!req.user) {
+    res.json({ user: null });
+    return;
+  }
+  res.json({ user: req.user });
 });
 
 app.get("/api/themes", (_req, res) => {
