@@ -1390,6 +1390,11 @@ button:disabled {
   margin: 0 auto;
 }
 
+/* Keep scroll position when header/status updates above the shape grid */
+.mobile-body #gameCard > .card:first-child {
+  overflow-anchor: none;
+}
+
 .mobile-champion-card {
   margin-top: 1rem;
   text-align: center;

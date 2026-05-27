@@ -149,6 +149,27 @@
       return joined && gameCard && !gameCard.classList.contains("hidden");
     }
 
+    /** Keep shape panel at same on-screen position when header/status/layout shifts. */
+    function preserveMobilePlayScroll(updateFn) {
+      const anchorTop = mobilePlayCard?.getBoundingClientRect().top;
+      updateFn();
+      if (anchorTop == null || !Number.isFinite(anchorTop)) return;
+
+      function compensate() {
+        const nextTop = mobilePlayCard?.getBoundingClientRect().top;
+        if (nextTop == null || !Number.isFinite(nextTop)) return;
+        const delta = nextTop - anchorTop;
+        if (Math.abs(delta) > 0.5) {
+          window.scrollBy(0, delta);
+        }
+      }
+
+      requestAnimationFrame(compensate);
+      shapeGrid?.querySelectorAll("img").forEach((img) => {
+        if (!img.complete) img.addEventListener("load", compensate, { once: true });
+      });
+    }
+
     const MOBILE_PRESET_BACKGROUNDS = new Set([
       "midnight",
       "ocean",
@@ -507,14 +528,16 @@
 
     socket.on("pickResult", (data) => {
       if (!joined || data.correct) return;
-      mistakesThisRound = data.mistakesUsed || mistakesThisRound;
-      if (data.outOfChances) {
-        canPickThisRound = false;
-        mobileStatus.textContent = "Wrong 3 times — wait for the next round.";
-      } else {
-        mobileStatus.textContent = `Wrong shape! ${data.mistakesRemaining} try${data.mistakesRemaining === 1 ? "" : "ies"} left.`;
-      }
-      updateTriesDisplay();
+      preserveMobilePlayScroll(() => {
+        mistakesThisRound = data.mistakesUsed || mistakesThisRound;
+        if (data.outOfChances) {
+          canPickThisRound = false;
+          mobileStatus.textContent = "Wrong 3 times — wait for the next round.";
+        } else {
+          mobileStatus.textContent = `Wrong shape! ${data.mistakesRemaining} try${data.mistakesRemaining === 1 ? "" : "ies"} left.`;
+        }
+        updateTriesDisplay();
+      });
     });
 
     socket.on("eventBranding", (branding) => {
@@ -542,61 +565,63 @@
         return;
       }
 
-      if (state.started && !state.ended) {
-        hideMobileChampion();
-        resetRoundTries(state.roundNumber || 0);
-      }
-
-      const mobileShapes = Array.isArray(state.mobileShapes) ? state.mobileShapes : [];
-      if (state.started && !state.ended && mobileShapes.length) {
-        const shapesKey = mobileShapes.join("\0");
-        if (shapesKey !== lastMobileShapesKey) {
-          lastMobileShapesKey = shapesKey;
-          renderShapeButtons(mobileShapes);
+      preserveMobilePlayScroll(() => {
+        if (state.started && !state.ended) {
+          hideMobileChampion();
+          resetRoundTries(state.roundNumber || 0);
         }
-      } else if (!state.started || state.ended) {
-        lastMobileShapesKey = "";
-        shapeGrid.innerHTML = "";
-      }
 
-      canPick = state.started && !state.ended && canPickThisRound;
+        const mobileShapes = Array.isArray(state.mobileShapes) ? state.mobileShapes : [];
+        if (state.started && !state.ended && mobileShapes.length) {
+          const shapesKey = mobileShapes.join("\0");
+          if (shapesKey !== lastMobileShapesKey) {
+            lastMobileShapesKey = shapesKey;
+            renderShapeButtons(mobileShapes);
+          }
+        } else if (!state.started || state.ended) {
+          lastMobileShapesKey = "";
+          shapeGrid.innerHTML = "";
+        }
 
-      const me = (state.leaderboard || []).find((p) => p.id === myProfile?.id);
-      if (me) {
-        myProfile.score = me.score;
-        playerHeader.innerHTML = renderPlayerProfile(myProfile);
-      }
+        canPick = state.started && !state.ended && canPickThisRound;
 
-      if (!state.started && !state.ended) {
-        mobileStatus.textContent = "Waiting for host to start...";
-      } else if (state.ended) {
-        showMobileChampion(state.leaderboard);
+        const me = (state.leaderboard || []).find((p) => p.id === myProfile?.id);
         if (me) {
-          mobileStatus.textContent = `Game ended. Your score: ${me.score}`;
+          myProfile.score = me.score;
+          playerHeader.innerHTML = renderPlayerProfile(myProfile);
         }
-      } else if (canPickThisRound) {
-        mobileStatus.textContent = `Round ${state.roundNumber} / ${state.totalRounds} — pick the matching shape`;
-      }
-      updateTriesDisplay();
+
+        if (!state.started && !state.ended) {
+          mobileStatus.textContent = "Waiting for host to start...";
+        } else if (state.ended) {
+          showMobileChampion(state.leaderboard);
+          if (me) {
+            mobileStatus.textContent = `Game ended. Your score: ${me.score}`;
+          }
+        } else if (canPickThisRound) {
+          mobileStatus.textContent = `Round ${state.roundNumber} / ${state.totalRounds} — pick the matching shape`;
+        }
+        updateTriesDisplay();
+      });
     });
 
     socket.on("roundWinner", (data) => {
       if (!joined) return;
-      canPick = false;
-      canPickThisRound = false;
-      mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}.`;
+      preserveMobilePlayScroll(() => {
+        canPick = false;
+        canPickThisRound = false;
+        mobileStatus.textContent = `${data.winner.name} won round ${data.roundNumber}.`;
+      });
       playRoundWinSound();
-      if (data.correctShape) {
-        lastMobileShapesKey = String(data.correctShape);
-        renderShapeButtons([data.correctShape]);
-      }
     });
 
     socket.on("roundTimeout", (data) => {
       if (!joined) return;
-      canPick = false;
-      canPickThisRound = false;
-      mobileStatus.textContent = `Time's up — round ${data.roundNumber} ended with no winner.`;
+      preserveMobilePlayScroll(() => {
+        canPick = false;
+        canPickThisRound = false;
+        mobileStatus.textContent = `Time's up — round ${data.roundNumber} ended with no winner.`;
+      });
       playRoundTimeoutSound();
     });
 
