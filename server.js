@@ -16,6 +16,7 @@ const { PORT, IS_PRODUCTION, PUBLIC_URL, MAX_PLAYERS, ROUND_TIMEOUT_MS } = requi
 const userStore = require("./lib/user-store");
 const authLib = require("./lib/auth");
 const googleAuth = require("./lib/google-auth");
+const { attachSocketAuthMiddleware } = require("./lib/socket-auth");
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,6 +36,17 @@ const io = new Server(httpServer, {
     credentials: true
   }
 });
+
+attachSocketAuthMiddleware(io);
+
+function appendAudit({ userId, email, req, type, meta }) {
+  userStore.appendActivity({
+    userId: userId ?? req?.user?.id ?? null,
+    email: email ? userStore.normalizeEmail(email) : req?.user?.email ?? null,
+    type: String(type || "unknown"),
+    meta: meta && typeof meta === "object" ? meta : {}
+  });
+}
 
 const TOTAL_ROUNDS = 20;
 const MOBILE_SHAPES_PER_ROUND = 18;
@@ -501,6 +513,7 @@ app.post("/api/auth/register", async (req, res) => {
     }
     const passwordHash = await authLib.hashPassword(password);
     const user = userStore.createUser({ email, passwordHash });
+    appendAudit({ userId: user.id, email: user.email, type: "auth.register", meta: {} });
     const publicUser = authLib.setAuthSession(res, user);
     res.status(201).json({ user: publicUser });
   } catch (error) {
@@ -522,6 +535,7 @@ app.post("/api/auth/login", async (req, res) => {
       res.status(401).json({ error: "Incorrect email or password." });
       return;
     }
+    appendAudit({ userId: user.id, email: user.email, type: "auth.login", meta: {} });
     const publicUser = authLib.setAuthSession(res, user);
     res.json({ user: publicUser });
   } catch (_error) {
@@ -536,6 +550,7 @@ app.post("/api/auth/google", async (req, res) => {
       googleId: profile.googleId,
       email: profile.email
     });
+    appendAudit({ userId: user.id, email: user.email, type: "auth.login_google", meta: {} });
     const publicUser = authLib.setAuthSession(res, user);
     res.json({ user: publicUser });
   } catch (error) {
@@ -544,7 +559,8 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
-app.post("/api/auth/logout", (_req, res) => {
+app.post("/api/auth/logout", (req, res) => {
+  appendAudit({ req, type: "auth.logout", meta: {} });
   authLib.clearAuthCookie(res);
   res.json({ ok: true });
 });
@@ -555,6 +571,28 @@ app.get("/api/auth/me", (req, res) => {
     return;
   }
   res.json({ user: req.user });
+});
+
+app.get("/admin", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+app.get("/api/admin/summary", authLib.requireAdmin, (_req, res) => {
+  res.json(userStore.getAdminSummary());
+});
+
+app.get("/api/admin/users", authLib.requireAdmin, (_req, res) => {
+  res.json({ users: userStore.listUsersPublic() });
+});
+
+app.get("/api/admin/mobile-players", authLib.requireAdmin, (_req, res) => {
+  res.json({ players: userStore.listMobilePlayersAdmin() });
+});
+
+app.get("/api/admin/activity", authLib.requireAdmin, (req, res) => {
+  const limit = Number(req.query.limit) || 100;
+  const offset = Number(req.query.offset) || 0;
+  res.json(userStore.listActivity({ limit, offset }));
 });
 
 app.get("/api/themes", (_req, res) => {
@@ -1020,9 +1058,27 @@ io.on("connection", (socket) => {
     });
     emitPlayerJoined(player);
     emitGameState();
+    appendAudit({
+      type: "mobile.player_joined",
+      meta: {
+        name: player.name,
+        countryCode: player.countryCode
+      }
+    });
   });
 
   socket.on("hostStartGame", () => {
+    const eventTitle = String(eventConfig.title || "").trim() || "Untitled game";
+    const authUser = socket.data.authUser || null;
+    userStore.recordGameStarted({
+      hostUserId: authUser?.id || null,
+      hostEmail: authUser?.email || null,
+      eventTitle,
+      players: [...players.values()].map((player) => ({
+        name: player.name,
+        countryCode: player.countryCode
+      }))
+    });
     startGame();
   });
 
@@ -1125,10 +1181,32 @@ httpServer.on("error", (error) => {
 httpServer.listen(PORT, "0.0.0.0", () => {
   const { DATA_DIR } = require("./lib/config");
   const base = PUBLIC_URL || `http://localhost:${PORT}`;
+
+  const bootstrapEmail = process.env.ADMIN_BOOTSTRAP_EMAIL;
+  const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+  if (bootstrapEmail && bootstrapPassword) {
+    userStore
+      .bootstrapAdminAccount({
+        email: bootstrapEmail,
+        password: bootstrapPassword,
+        authLib
+      })
+      .then((result) => {
+        if (result.created) {
+          console.log(`Admin account created for ${userStore.normalizeEmail(bootstrapEmail)}`);
+        }
+      })
+      .catch((err) => {
+        console.warn("Admin bootstrap skipped:", err.message);
+      });
+  }
+
   console.log(`Shape Match Game listening on port ${PORT}`);
   console.log(`Data dir: ${DATA_DIR}`);
   console.log(`Host:    ${base}/`);
   console.log(`Players: ${base}/mobile`);
+  console.log(`Account: ${base}/account`);
+  console.log(`Admin:   ${base}/admin`);
   console.log(`Health:  ${base}/health`);
   console.log(`Max players: ${MAX_PLAYERS}`);
   console.log(`Round timeout: ${ROUND_TIMEOUT_MS}ms`);

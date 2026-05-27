@@ -345,10 +345,16 @@
         return;
       }
       const safeEmail = escapeHtml(sessionUser.email);
+      const adminLink =
+        sessionUser.role === "admin"
+          ? ' · <a href="/admin" class="host-account-admin">Admin</a>'
+          : "";
       hostAccountSummary.innerHTML =
         '<span class="host-account-signed-in">' +
         safeEmail +
-        '</span> · <button type="button" class="host-account-linkish" id="hostSignOutBtn">Sign out</button>';
+        "</span>" +
+        adminLink +
+        ' · <button type="button" class="host-account-linkish" id="hostSignOutBtn">Sign out</button>';
     }
 
     if (hostAccountSummary) {

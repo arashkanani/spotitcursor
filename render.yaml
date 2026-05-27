@@ -15,6 +15,8 @@ services:
         generateValue: true
       - key: GOOGLE_CLIENT_ID
         sync: false
+      - key: ADMIN_EMAILS
+        sync: false
     # PUBLIC_URL: Render sets RENDER_EXTERNAL_URL automatically (used by the app).
     # Optional: add a persistent disk in the Render dashboard → Mount path /var/data
     # and set DATA_DIR=/var/data to keep uploaded sponsor shapes across redeploys.
