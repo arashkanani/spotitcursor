@@ -20,9 +20,6 @@
   <div class="bg-orb orb-3"></div>
   <div class="bg-sparkle"></div>
   <div class="page">
-    <header class="host-top-bar">
-      <div id="hostAccountSummary" class="host-account-summary" aria-live="polite"></div>
-    </header>
     <section id="setupView" class="host-setup">
       <div class="setup-card card">
         <div id="eventCustomizePanel" class="event-customize-panel">
@@ -30,32 +27,6 @@
             <p class="event-eyebrow">Event planner</p>
             <h2 class="setup-title">Design your game screen</h2>
             <p class="setup-subtitle">Set the <strong>title</strong>, <strong>background</strong>, and <strong>sponsor shapes</strong>. The live preview below matches the real game.</p>
-          </div>
-
-          <div class="setup-section saved-dashboards-section">
-            <h3 class="setup-section-title">Saved dashboards</h3>
-            <p id="savedDashboardsHint" class="setup-hint">
-              Sign in (top right) to save this event layout and load it on your next visit.
-            </p>
-            <div id="savedDashboardsControls" class="saved-dashboards-controls hidden">
-              <div class="dashboard-name-field">
-                <label class="field-label" for="dashboardNameInput">Save current layout as</label>
-                <input id="dashboardNameInput" type="text" maxlength="80" placeholder="e.g. Acme booth — Day 2">
-              </div>
-              <div class="dashboard-actions">
-                <button type="button" id="dashboardSaveBtn" class="ghost-btn">Save dashboard</button>
-              </div>
-              <div>
-                <label class="field-label" for="dashboardSelect">Your dashboards</label>
-                <select id="dashboardSelect" class="dashboard-select-host" aria-label="Saved dashboards">
-                  <option value="">Loading…</option>
-                </select>
-              </div>
-              <div class="dashboard-actions">
-                <button type="button" id="dashboardLoadBtn" class="start-game-btn" style="font-size: 0.9rem">Load</button>
-                <button type="button" id="dashboardDeleteBtn" class="clear-background-btn" style="font-size: 0.9rem">Delete</button>
-              </div>
-            </div>
           </div>
 
           <div class="setup-section">
@@ -351,15 +322,6 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const _origFetchHost = window.fetch.bind(window);
-    window.fetch = function shapeMatchFetch(input, init) {
-      const merged = init === undefined ? {} : { ...init };
-      if (!merged.credentials) {
-        merged.credentials = "include";
-      }
-      return _origFetchHost(input, merged);
-    };
-
     const socket = io();
     const setupView = document.getElementById("setupView");
     const lobbyView = document.getElementById("lobbyView");
@@ -429,15 +391,6 @@
     const editEventBtn = document.getElementById("editEventBtn");
     const backToMenuBtn = document.getElementById("backToMenuBtn");
     let hostPinnedView = "setup";
-    let sessionUser = null;
-    const hostAccountSummary = document.getElementById("hostAccountSummary");
-    const savedDashboardsHint = document.getElementById("savedDashboardsHint");
-    const savedDashboardsControls = document.getElementById("savedDashboardsControls");
-    const dashboardNameInput = document.getElementById("dashboardNameInput");
-    const dashboardSaveBtn = document.getElementById("dashboardSaveBtn");
-    const dashboardSelect = document.getElementById("dashboardSelect");
-    const dashboardLoadBtn = document.getElementById("dashboardLoadBtn");
-    const dashboardDeleteBtn = document.getElementById("dashboardDeleteBtn");
     const playerJoinUrl = document.getElementById("playerJoinUrl");
     const qrImage = document.getElementById("qrImage");
     const lobbyPlayerList = document.getElementById("lobbyPlayerList");
@@ -694,87 +647,6 @@
           scale: entry.scale
         }))
       };
-    }
-
-    function collectDashboardConfig() {
-      return {
-        title: eventTitleInput ? eventTitleInput.value.trim() : "",
-        sponsorId: selectedSponsorId,
-        themePattern: selectedThemePattern,
-        themeBackground: getPresetThemeBackground(),
-        customBackgroundUrl: customBackgroundUrl || null,
-        customBackgroundUrls: [...customBackgroundUrls],
-        ...getBackgroundTransformPayload(),
-        circlesPanelTransparent,
-        rankingPanelTransparent
-      };
-    }
-
-    async function refreshAccountUi() {
-      const res = await fetch("/api/auth/me");
-      const data = await res.json().catch(() => ({}));
-      sessionUser = data.user || null;
-      if (!hostAccountSummary) {
-        return;
-      }
-      if (!sessionUser) {
-        hostAccountSummary.innerHTML =
-          '<span class="host-account-signed-out">Guests can host freely — <a href="/account.html?next=' +
-          encodeURIComponent("/") +
-          '">Sign in</a> to save dashboards.</span>';
-        savedDashboardsControls?.classList.add("hidden");
-        savedDashboardsHint?.classList.remove("hidden");
-        return;
-      }
-      const adminLink =
-        sessionUser.role === "admin"
-          ? ' · <a href="/admin.html" class="host-account-admin">Admin</a>'
-          : "";
-      hostAccountSummary.innerHTML =
-        '<span class="host-account-signed-in">' +
-        escapeHtml(sessionUser.email) +
-        '</span>' +
-        adminLink +
-        ' · <button type="button" class="host-account-linkish" id="hostSignOutBtn">Sign out</button>';
-      savedDashboardsControls?.classList.remove("hidden");
-      savedDashboardsHint?.classList.add("hidden");
-    }
-
-    async function refreshDashboardList() {
-      if (!dashboardSelect) {
-        return;
-      }
-      if (!sessionUser) {
-        dashboardSelect.innerHTML = "<option value=\"\">Sign in to see dashboards</option>";
-        return;
-      }
-      const res = await fetch("/api/dashboards");
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        dashboardSelect.innerHTML = "<option value=\"\">Could not load</option>";
-        return;
-      }
-      const list = Array.isArray(data.dashboards) ? data.dashboards : [];
-      dashboardSelect.innerHTML =
-        '<option value=\"\">Choose a saved layout…</option>';
-      for (const d of list) {
-        const opt = document.createElement("option");
-        opt.value = d.id;
-        opt.textContent = d.name;
-        dashboardSelect.appendChild(opt);
-      }
-    }
-
-    if (hostAccountSummary) {
-      hostAccountSummary.addEventListener("click", async (ev) => {
-        if (!ev.target || ev.target.id !== "hostSignOutBtn") {
-          return;
-        }
-        await fetch("/api/auth/logout", { method: "POST" });
-        sessionUser = null;
-        refreshAccountUi();
-        refreshDashboardList();
-      });
     }
 
     function syncLegacyTransformFromEntry(entry) {
@@ -2501,89 +2373,6 @@
       continueToLobbyBtn.disabled = false;
     });
 
-    if (dashboardSaveBtn && dashboardNameInput) {
-      dashboardSaveBtn.addEventListener("click", async () => {
-        const name = dashboardNameInput.value.trim();
-        if (!name) {
-          setupMessage.textContent = "Enter a name before saving.";
-          dashboardNameInput.focus();
-          return;
-        }
-        try {
-          const res = await fetch("/api/dashboards", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, config: collectDashboardConfig() })
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            setupMessage.textContent = data.error || "Could not save dashboard.";
-            return;
-          }
-          dashboardNameInput.value = "";
-          await refreshDashboardList();
-          if (data.dashboard?.id) {
-            dashboardSelect.value = data.dashboard.id;
-          }
-          setupMessage.textContent = "Dashboard saved.";
-        } catch (_e) {
-          setupMessage.textContent = "Could not save dashboard.";
-        }
-      });
-    }
-
-    if (dashboardLoadBtn && dashboardSelect) {
-      dashboardLoadBtn.addEventListener("click", async () => {
-        const id = dashboardSelect.value;
-        if (!id) {
-          setupMessage.textContent = "Choose a saved dashboard from the list.";
-          return;
-        }
-        setupMessage.textContent = "Applying…";
-        try {
-          const res = await fetch(`/api/dashboards/${encodeURIComponent(id)}/apply`, {
-            method: "POST"
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            setupMessage.textContent = data.error || "Could not apply dashboard.";
-            return;
-          }
-          applyEventBranding(data);
-          await loadSponsorCatalog();
-          updateChosenSponsorBar();
-          renderCustomBackgroundList();
-          refreshAdBackgroundPlayback();
-          if (setupPhase === "customize") {
-            refreshDashboardPreview();
-          }
-          setupMessage.textContent =
-            "Saved layout applied. Review the preview — then continue to the lobby.";
-        } catch (_e) {
-          setupMessage.textContent = "Could not apply dashboard.";
-        }
-      });
-    }
-
-    if (dashboardDeleteBtn && dashboardSelect) {
-      dashboardDeleteBtn.addEventListener("click", async () => {
-        const id = dashboardSelect.value;
-        if (!id) return;
-        if (!window.confirm("Delete this saved dashboard?")) {
-          return;
-        }
-        const res = await fetch(`/api/dashboards/${encodeURIComponent(id)}`, {
-          method: "DELETE"
-        });
-        if (!res.ok) {
-          setupMessage.textContent = "Could not delete dashboard.";
-          return;
-        }
-        await refreshDashboardList();
-        setupMessage.textContent = "Dashboard removed.";
-      });
-    }
-
     loadSponsorCatalog().catch(() => {
       sponsorGridHint.textContent = "Could not load sponsors. Is the server running?";
     });
@@ -2610,18 +2399,12 @@
         } else {
           openEventDashboard();
         }
-        refreshAccountUi()
-          .then(() => refreshDashboardList())
-          .catch(() => {});
       })
       .catch(() => {
         themeCatalog = { backgrounds: [], presets: [] };
         initThemePicker();
         openEventDashboard();
         setupMessage.textContent = "Server offline — start with npm start, then refresh. You can still edit the form below.";
-        refreshAccountUi()
-          .then(() => refreshDashboardList())
-          .catch(() => {});
       });
 
     fetch("/health")

@@ -672,74 +672,7 @@ button:disabled {
   line-height: 1.45;
 }
 
-.host-top-bar {
-  max-width: 960px;
-  margin: 0 auto 0.5rem;
-  padding: 0.25rem 1.6rem 0;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.host-account-summary {
-  font-size: 0.84rem;
-  color: var(--text-secondary);
-  text-align: right;
-  line-height: 1.45;
-}
-
-.host-account-summary a {
-  color: var(--accent-cyan);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.host-account-summary a:hover {
-  text-decoration: underline;
-}
-
-.host-account-summary .host-account-admin {
-  color: #c4b5fd;
-}
-
-.host-account-summary .host-account-linkish {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  font-weight: 600;
-  color: var(--accent-cyan);
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.saved-dashboards-section .saved-dashboards-controls:not(.hidden) {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.85rem;
-  align-items: end;
-  margin-top: 0.85rem;
-}
-
-.dashboard-select-host {
-  width: 100%;
-  max-width: 320px;
-  padding: 0.55rem 0.65rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-glass);
-  background: rgba(8, 12, 24, 0.75);
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 0.9rem;
-}
-
-.dashboard-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-
+.ghost-btn {
   border: 1px solid var(--border-glass);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
