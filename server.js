@@ -1370,6 +1370,9 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
   const bootstrapReset = String(process.env.ADMIN_BOOTSTRAP_RESET || "").toLowerCase() === "true";
   if (bootstrapEmail && bootstrapPassword) {
+    console.log(
+      `Admin bootstrap starting (reset=${bootstrapReset}, email=${userStore.normalizeEmail(bootstrapEmail)})`
+    );
     userStore
       .bootstrapAdminAccount({
         email: bootstrapEmail,
@@ -1380,16 +1383,30 @@ httpServer.listen(PORT, "0.0.0.0", () => {
       .then((result) => {
         const email = userStore.normalizeEmail(bootstrapEmail);
         if (result.created) {
-          console.log(`Admin account created for ${email}`);
+          console.log(`Admin bootstrap OK: account created for ${email}`);
         } else if (result.reset) {
-          console.log(`Admin password reset for ${email} (ADMIN_BOOTSTRAP_RESET=true)`);
+          console.log(`Admin bootstrap OK: password reset for ${email}`);
         } else if (result.reason === "exists") {
-          console.log(`Admin account already exists for ${email} (set ADMIN_BOOTSTRAP_RESET=true once to reset password)`);
+          console.log(
+            `Admin bootstrap: account already exists for ${email} — set ADMIN_BOOTSTRAP_RESET=true and redeploy to reset password`
+          );
+        } else if (result.reason === "not_admin_email") {
+          console.warn(
+            `Admin bootstrap skipped: ${email} is not in ADMIN_EMAILS (${process.env.ADMIN_EMAILS || "empty"})`
+          );
+        } else if (result.reason === "invalid") {
+          console.warn("Admin bootstrap skipped: email or password invalid (password needs 8+ characters).");
+        } else {
+          console.log(`Admin bootstrap finished: ${result.reason || "unknown"} (${email})`);
         }
       })
       .catch((err) => {
-        console.warn("Admin bootstrap skipped:", err.message);
+        console.warn("Admin bootstrap failed:", err.message);
       });
+  } else {
+    console.log(
+      `Admin bootstrap not configured (ADMIN_BOOTSTRAP_EMAIL set=${Boolean(bootstrapEmail)}, ADMIN_BOOTSTRAP_PASSWORD set=${Boolean(bootstrapPassword)})`
+    );
   }
 
   console.log(`Shape Match Game listening on port ${PORT}`);
