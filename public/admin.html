@@ -32,6 +32,30 @@
     <div id="adminSummary" class="admin-summary-grid" aria-live="polite"></div>
 
     <div class="admin-panels">
+      <section class="admin-panel card admin-panel-wide">
+        <div class="admin-panel-head">
+          <h2>Access codes (Demo / Real)</h2>
+          <button type="button" class="ghost-btn" id="reloadCodesBtn">Refresh</button>
+        </div>
+        <p class="admin-panel-hint">Disable any code to immediately generate a fresh replacement of the same tier. Force logout clears all active sessions using that code.</p>
+        <div class="admin-table-wrap">
+          <table class="admin-table admin-table-compact">
+            <thead>
+              <tr>
+                <th>Tier</th>
+                <th>Username</th>
+                <th>Password</th>
+                <th>Usage</th>
+                <th>Last usage</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="codesTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="admin-panel card">
         <div class="admin-panel-head">
           <h2>Registered users</h2>
@@ -109,6 +133,7 @@
     const usersTableBody = document.getElementById("usersTableBody");
     const mobileTableBody = document.getElementById("mobileTableBody");
     const activityTableBody = document.getElementById("activityTableBody");
+    const codesTableBody = document.getElementById("codesTableBody");
     let activityOffset = 0;
 
     function showErr(msg) {
@@ -165,7 +190,9 @@
         ["Registered users", data.registeredUsers],
         ["Mobile players", data.mobilePlayers],
         ["Account games started", data.accountGamesHosted],
-        ["Mobile game sessions", data.mobileGameSessions]
+        ["Mobile game sessions", data.mobileGameSessions],
+        ["Active demo codes", data.accessCodes?.demo ?? 0],
+        ["Active real codes", data.accessCodes?.real ?? 0]
       ];
       adminSummary.innerHTML = cards
         .map(
@@ -191,6 +218,42 @@
       }
       if (!data.users?.length) {
         usersTableBody.innerHTML = '<tr><td colspan="5" class="admin-empty">No registered users yet.</td></tr>';
+      }
+    }
+
+    function formatCodeLastUsage(code) {
+      const row = Array.isArray(code.usageLogs) ? code.usageLogs[0] : null;
+      if (!row) return "—";
+      return `${formatDate(row.at)} (${row.playerCount} players)`;
+    }
+
+    async function loadAccessCodes() {
+      const data = await ShapeMatchAuth.apiFetch("/api/admin/access-codes");
+      const codes = Array.isArray(data.codes) ? data.codes : [];
+      codesTableBody.innerHTML = "";
+      for (const code of codes) {
+        const tr = document.createElement("tr");
+        const usage = `${code.usesCount || 0} / ${code.usesLimit || 0}`;
+        const status = code.disabled ? "Disabled" : "Active";
+        const disabledBtn = code.disabled
+          ? `<span class="admin-empty">Replaced</span>`
+          : `<button class="ghost-btn" data-disable-code="${escapeHtml(code.id)}">Disable & regenerate</button>`;
+        const forceBtn = code.disabled
+          ? ""
+          : `<button class="ghost-btn" data-force-logout-code="${escapeHtml(code.id)}">Force logout</button>`;
+        tr.innerHTML = `
+          <td>${escapeHtml(code.tier || "—")}</td>
+          <td>${escapeHtml(code.username || "—")}</td>
+          <td>${escapeHtml(code.password || "—")}</td>
+          <td>${escapeHtml(usage)}</td>
+          <td class="admin-cell-wrap">${escapeHtml(formatCodeLastUsage(code))}</td>
+          <td>${escapeHtml(status)}</td>
+          <td>${disabledBtn} ${forceBtn}</td>
+        `;
+        codesTableBody.appendChild(tr);
+      }
+      if (!codes.length) {
+        codesTableBody.innerHTML = '<tr><td colspan="7" class="admin-empty">No access codes found.</td></tr>';
       }
     }
 
@@ -238,13 +301,14 @@
 
     async function refreshAll() {
       showErr("");
-      await Promise.all([loadSummary(), loadUsers(), loadMobilePlayers()]);
+      await Promise.all([loadSummary(), loadUsers(), loadMobilePlayers(), loadAccessCodes()]);
       activityOffset = 0;
       await loadActivity({ append: false });
     }
 
     document.getElementById("reloadUsersBtn")?.addEventListener("click", () => loadUsers().catch((e) => showErr(e.message)));
     document.getElementById("reloadMobileBtn")?.addEventListener("click", () => loadMobilePlayers().catch((e) => showErr(e.message)));
+    document.getElementById("reloadCodesBtn")?.addEventListener("click", () => loadAccessCodes().catch((e) => showErr(e.message)));
     document.getElementById("reloadActivityBtn")?.addEventListener("click", () => {
       activityOffset = 0;
       loadActivity({ append: false }).catch((e) => showErr(e.message));
@@ -255,6 +319,48 @@
     document.getElementById("adminSignOutBtn")?.addEventListener("click", async () => {
       await ShapeMatchAuth.logout();
       window.location.href = "/account";
+    });
+
+    codesTableBody?.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-disable-code]");
+      if (btn) {
+        const id = btn.getAttribute("data-disable-code");
+        if (!id) return;
+        btn.disabled = true;
+        try {
+          await ShapeMatchAuth.apiFetch(`/api/admin/access-codes/${encodeURIComponent(id)}/disable-regenerate`, {
+            method: "POST"
+          });
+          await Promise.all([loadAccessCodes(), loadSummary()]);
+        } catch (err) {
+          showErr(err.message || "Could not disable code.");
+        } finally {
+          btn.disabled = false;
+        }
+        return;
+      }
+
+      const forceBtn = ev.target.closest("[data-force-logout-code]");
+      if (forceBtn) {
+        const id = forceBtn.getAttribute("data-force-logout-code");
+        if (!id) return;
+        forceBtn.disabled = true;
+        try {
+          const data = await ShapeMatchAuth.apiFetch(`/api/admin/access-codes/${encodeURIComponent(id)}/force-logout`, {
+            method: "POST"
+          });
+          showErr("");
+          if ((data?.clearedSessions || 0) > 0) {
+            alert(`Forced logout successful. Cleared ${data.clearedSessions} active session(s).`);
+          } else {
+            alert("Force logout completed. No active sessions were using this code.");
+          }
+        } catch (err) {
+          showErr(err.message || "Could not force logout code.");
+        } finally {
+          forceBtn.disabled = false;
+        }
+      }
     });
 
     requireAdminSession()

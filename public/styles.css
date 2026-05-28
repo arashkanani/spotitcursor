@@ -2940,8 +2940,20 @@ body[data-pattern="cinema"] .setup-preview-inner .circle {
 /* ——— Host account bar ——— */
 .host-top-bar {
   display: flex;
+  align-items: center;
+  gap: 0.8rem;
   justify-content: flex-end;
   margin-bottom: 0.75rem;
+}
+
+.host-access-badge {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  border: 1px solid rgba(92, 225, 230, 0.35);
+  background: rgba(92, 225, 230, 0.08);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  white-space: nowrap;
 }
 
 .host-account-summary {

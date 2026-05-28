@@ -22,6 +22,7 @@
   <div class="bg-sparkle"></div>
   <div class="page">
     <header class="host-top-bar">
+      <div id="hostAccessBadge" class="host-access-badge hidden" aria-live="polite"></div>
       <div id="hostAccountSummary" class="host-account-summary" aria-live="polite"></div>
     </header>
     <section id="setupView" class="host-setup">
@@ -327,8 +328,34 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    const hostAccessBadge = document.getElementById("hostAccessBadge");
     const hostAccountSummary = document.getElementById("hostAccountSummary");
     let sessionUser = null;
+    let dashboardAccess = null;
+
+    function renderAccessBadge() {
+      if (!hostAccessBadge || !dashboardAccess) {
+        hostAccessBadge?.classList.add("hidden");
+        return;
+      }
+      const tier = String(dashboardAccess.tier || "demo").toUpperCase();
+      const rounds = Number(dashboardAccess.rounds || 20);
+      const cap = Number(dashboardAccess.maxPlayers || 0);
+      const remaining = Math.max(0, Number(dashboardAccess.usesRemaining ?? 0));
+      hostAccessBadge.textContent = `${tier} • ${rounds} rounds • ${cap} players max • ${remaining} launch(es) left`;
+      hostAccessBadge.classList.remove("hidden");
+    }
+
+    async function refreshDashboardAccess() {
+      try {
+        const res = await fetch("/api/access/me", { credentials: "include" });
+        const data = await res.json().catch(() => ({}));
+        dashboardAccess = data?.access || null;
+      } catch (_err) {
+        dashboardAccess = null;
+      }
+      renderAccessBadge();
+    }
 
     async function refreshAccountUi() {
       if (!hostAccountSummary || typeof ShapeMatchAuth === "undefined") return;
@@ -370,6 +397,7 @@
       });
       refreshAccountUi();
     }
+    refreshDashboardAccess();
     const setupView = document.getElementById("setupView");
     const lobbyView = document.getElementById("lobbyView");
     const gameView = document.getElementById("gameView");
@@ -2978,6 +3006,12 @@
       }
     }
 
+    socket.on("hostError", (payload) => {
+      const message = payload?.message || "Could not start game with this access code.";
+      setupMessage.textContent = message;
+      alert(message);
+    });
+
     socket.on("eventBranding", (branding) => {
       if (hostPinnedView === "setup") return;
       applyEventBranding(branding);
@@ -2991,6 +3025,7 @@
       if (state.eventBranding) applyEventBranding(state.eventBranding);
 
       if (state.started && !state.ended) {
+        refreshDashboardAccess();
         hideGameChampionPanel();
         showGameView();
         renderRanking(latestLeaderboard);
@@ -3014,6 +3049,7 @@
       }
 
       if (state.ended) {
+        refreshDashboardAccess();
         showGameView();
         showGameChampionPanel(state.leaderboard);
         return;
