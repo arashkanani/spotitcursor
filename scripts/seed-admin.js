@@ -23,11 +23,14 @@ async function main() {
     process.exit(1);
   }
 
-  const result = await userStore.bootstrapAdminAccount({ email, password, authLib });
+  const forceReset = String(process.env.ADMIN_BOOTSTRAP_RESET || "").toLowerCase() === "true";
+  const result = await userStore.bootstrapAdminAccount({ email, password, authLib, forceReset });
   if (result.created) {
     console.log(`Admin account created for ${email}`);
+  } else if (result.reset) {
+    console.log(`Admin password reset for ${email}`);
   } else if (result.reason === "exists") {
-    console.log(`Account already exists for ${email}`);
+    console.log(`Account already exists for ${email} (set ADMIN_BOOTSTRAP_RESET=true to reset password)`);
   } else {
     console.error("Could not create admin account:", result.reason);
     process.exit(1);

@@ -583,8 +583,13 @@ app.post("/api/auth/login", async (req, res) => {
     appendAudit({ userId: user.id, email: user.email, type: "auth.login", meta: {} });
     const publicUser = authLib.setAuthSession(res, user);
     res.json({ user: publicUser });
-  } catch (_error) {
-    res.status(400).json({ error: "Could not sign in." });
+  } catch (error) {
+    console.error("Auth login failed:", error);
+    let message = "Could not sign in.";
+    if (/SESSION_SECRET/i.test(String(error?.message || ""))) {
+      message = "Server auth is misconfigured. Set SESSION_SECRET to at least 16 characters on Render.";
+    }
+    res.status(400).json({ error: message });
   }
 });
 
@@ -1363,16 +1368,23 @@ httpServer.listen(PORT, "0.0.0.0", () => {
 
   const bootstrapEmail = process.env.ADMIN_BOOTSTRAP_EMAIL;
   const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+  const bootstrapReset = String(process.env.ADMIN_BOOTSTRAP_RESET || "").toLowerCase() === "true";
   if (bootstrapEmail && bootstrapPassword) {
     userStore
       .bootstrapAdminAccount({
         email: bootstrapEmail,
         password: bootstrapPassword,
-        authLib
+        authLib,
+        forceReset: bootstrapReset
       })
       .then((result) => {
+        const email = userStore.normalizeEmail(bootstrapEmail);
         if (result.created) {
-          console.log(`Admin account created for ${userStore.normalizeEmail(bootstrapEmail)}`);
+          console.log(`Admin account created for ${email}`);
+        } else if (result.reset) {
+          console.log(`Admin password reset for ${email} (ADMIN_BOOTSTRAP_RESET=true)`);
+        } else if (result.reason === "exists") {
+          console.log(`Admin account already exists for ${email} (set ADMIN_BOOTSTRAP_RESET=true once to reset password)`);
         }
       })
       .catch((err) => {
