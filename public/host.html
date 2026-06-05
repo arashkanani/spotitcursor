@@ -572,6 +572,7 @@
     }
     let currentEventTitle = "";
     let selectedSponsorId = null;
+    let savedGameSponsorId = null;
     let sponsorCatalog = [];
     let minShapesRequired = 19;
     let editContext = null;
@@ -1715,6 +1716,7 @@
       }
       if (branding?.sponsorId) {
         selectedSponsorId = branding.sponsorId;
+        savedGameSponsorId = branding.sponsorId;
       }
       syncCustomBackgroundsFromBranding(branding);
       renderCustomBackgroundList();
@@ -1754,6 +1756,33 @@
       if (setupPhase === "customize") refreshDashboardPreview();
     }
 
+    async function persistSelectedSponsorForGame(sponsorId) {
+      const id = sponsorId || selectedSponsorId;
+      const sponsor = sponsorCatalog.find((s) => s.id === id);
+      if (!sponsor?.ready) {
+        return { ok: false, reason: "not_ready" };
+      }
+      const title = String(eventTitleInput?.value || currentEventTitle || "").trim();
+      if (!title) {
+        return { ok: false, reason: "no_title" };
+      }
+      if (savedGameSponsorId === sponsor.id) {
+        return { ok: true, unchanged: true };
+      }
+
+      const res = await fetch("/api/event-branding/sponsor", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sponsorId: sponsor.id })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Could not save sponsor for the live game.");
+      }
+      applyEventBranding(data);
+      return { ok: true };
+    }
+
     function selectSponsor(sponsorId) {
       const sponsor = sponsorCatalog.find((s) => s.id === sponsorId);
       if (!sponsor) return;
@@ -1765,6 +1794,20 @@
         el.textContent = `Shapes by ${sponsor.name}`;
         el.hidden = false;
       });
+      if (sponsor.ready) {
+        void persistSelectedSponsorForGame(sponsor.id)
+          .then((result) => {
+            updateChosenSponsorBar();
+            if (result?.ok && !result.unchanged && setupMessage) {
+              setupMessage.textContent = `${sponsor.name} is now saved for the live game.`;
+            } else if (result?.reason === "no_title" && setupMessage) {
+              setupMessage.textContent = `${sponsor.name} selected — enter an event title, then Continue to player lobby.`;
+            }
+          })
+          .catch((err) => {
+            if (setupMessage) setupMessage.textContent = err.message || "Could not save sponsor for game.";
+          });
+      }
     }
 
     function activateSponsorCard(sponsor, options = {}) {
@@ -1796,9 +1839,12 @@
       chosenSponsorBar.classList.remove("hidden");
       chosenSponsorName.textContent = sponsor.name;
       if (sponsor.ready) {
-        chosenSponsorStatus.textContent = `${sponsor.shapeCount} circle shapes · Ready to play`;
+        const savedForGame = savedGameSponsorId === sponsor.id;
+        chosenSponsorStatus.textContent = savedForGame
+          ? `${sponsor.shapeCount} circle shapes · Saved for live game`
+          : `${sponsor.shapeCount} circle shapes · Selected (not saved for game yet)`;
         chosenSponsorStatus.classList.remove("is-warning");
-        chosenSponsorStatus.classList.add("is-ready");
+        chosenSponsorStatus.classList.add(savedForGame ? "is-ready" : "is-warning");
       } else {
         const need = minShapesRequired - sponsor.shapeCount;
         chosenSponsorStatus.textContent = `${sponsor.shapeCount} shapes — add ${need} more in edit mode`;
@@ -2177,11 +2223,21 @@
     function finishSponsorEdit() {
       showSetupPhase("customize");
       loadSponsorCatalog()
-        .then(() => {
+        .then(async () => {
           updateChosenSponsorBar();
           const sponsor = sponsorCatalog.find((s) => s.id === selectedSponsorId);
-          if (sponsor?.ready) {
-            setupMessage.textContent = `${sponsor.name} is ready — continue to the player lobby when you are set.`;
+          if (!sponsor?.ready) return;
+          try {
+            const result = await persistSelectedSponsorForGame(sponsor.id);
+            if (result?.ok && !result.unchanged) {
+              setupMessage.textContent = `${sponsor.name} saved for the live game — continue to the player lobby when ready.`;
+            } else if (result?.reason === "no_title") {
+              setupMessage.textContent = `${sponsor.name} is ready — enter an event title, then Continue to player lobby.`;
+            } else {
+              setupMessage.textContent = `${sponsor.name} is ready — continue to the player lobby when you are set.`;
+            }
+          } catch (err) {
+            setupMessage.textContent = err.message || "Could not save sponsor for game.";
           }
         })
         .catch(() => {});
@@ -2201,6 +2257,7 @@
         await openSponsorEdit(editContext.sponsorId, editContext.name);
         await loadSponsorCatalog();
         updateChosenSponsorBar();
+        await persistSelectedSponsorForGame(editContext.sponsorId).catch(() => {});
         const count = editShapeItems.length;
         const ready = count >= minShapesRequired;
         setupMessage.textContent = ready
@@ -3252,7 +3309,21 @@
       previewResizeObserver.observe(setupLiveDemo);
     }
 
-    startBtn.addEventListener("click", () => {
+    startBtn.addEventListener("click", async () => {
+      if (selectedSponsorId && selectedSponsorId !== savedGameSponsorId) {
+        try {
+          if (lobbyStatus) {
+            lobbyStatus.textContent = "Saving selected sponsor shapes for this game…";
+          }
+          await persistSelectedSponsorForGame(selectedSponsorId);
+        } catch (err) {
+          if (lobbyStatus) {
+            lobbyStatus.textContent = err.message || "Could not save sponsor for game.";
+          }
+          alert(err.message || "Could not save the selected sponsor for the live game. Open Edit and choose the sponsor again.");
+          return;
+        }
+      }
       primeGameAudio();
       hideGameChampionPanel();
       showGameView();

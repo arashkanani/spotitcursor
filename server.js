@@ -943,6 +943,48 @@ app.post("/api/event-background", backgroundUpload.single("background"), (req, r
   }
 });
 
+app.patch("/api/event-branding/sponsor", (req, res) => {
+  const sponsorId = String(req.body?.sponsorId || "").trim();
+  if (!sponsorId) {
+    res.status(400).json({ error: "Please choose a sponsor shape pack." });
+    return;
+  }
+
+  const title = String(eventConfig.title || "").trim();
+  if (!title) {
+    res.status(400).json({ error: "Enter an event title before saving shapes for the live game." });
+    return;
+  }
+
+  const sponsor = sponsors.getSponsorById(sponsorId);
+  if (!sponsor) {
+    res.status(400).json({ error: "Sponsor not found." });
+    return;
+  }
+  if (sponsor.shapeCount < sponsors.MIN_SHAPES_PER_SPONSOR) {
+    res.status(400).json({
+      error: `This sponsor needs at least ${sponsors.MIN_SHAPES_PER_SPONSOR} PNG shapes (has ${sponsor.shapeCount}).`
+    });
+    return;
+  }
+
+  if (game.started && !game.ended) {
+    cancelGame();
+  }
+
+  sponsors.setActiveSponsorId(sponsorId);
+  eventConfig = eventBrandingStore.writeEventConfig({
+    ...eventConfig,
+    title,
+    sponsorId: sponsor.id,
+    sponsorName: sponsor.name
+  });
+  const payload = getEventPayload();
+  io.emit("eventBranding", payload);
+  emitGameState();
+  res.json(payload);
+});
+
 app.put("/api/event-branding", (req, res) => {
   const title = String(req.body?.title || "").trim().slice(0, 80);
   const sponsorId = String(req.body?.sponsorId || "").trim();
