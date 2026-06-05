@@ -1773,7 +1773,7 @@
       const res = await fetch("/api/event-branding/sponsor", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sponsorId: sponsor.id })
+        body: JSON.stringify({ sponsorId: sponsor.id, title })
       });
       const data = await res.json();
       if (!res.ok) {

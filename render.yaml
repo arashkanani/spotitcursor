@@ -8,9 +8,15 @@ services:
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /health
+    disk:
+      name: spotitcursor-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATA_DIR
+        value: /var/data
       - key: SESSION_SECRET
         generateValue: true
       - key: GOOGLE_CLIENT_ID
@@ -18,5 +24,3 @@ services:
       - key: ADMIN_EMAILS
         sync: false
     # PUBLIC_URL: Render sets RENDER_EXTERNAL_URL automatically (used by the app).
-    # Optional: add a persistent disk in the Render dashboard → Mount path /var/data
-    # and set DATA_DIR=/var/data to keep uploaded sponsor shapes across redeploys.

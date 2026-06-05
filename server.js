@@ -140,6 +140,56 @@ const shapeUpload = multer({
 
 sponsors.initializeSponsors();
 
+function syncSponsorSelectionFromEventConfig() {
+  const sponsorId = eventConfig.sponsorId;
+  if (!sponsorId) return;
+  const sponsor = sponsors.getSponsorById(sponsorId);
+  if (!sponsor) {
+    console.warn(`Saved event sponsor "${sponsorId}" was not found in sponsor index.`);
+    return;
+  }
+  if (sponsor.shapeCount < sponsors.MIN_SHAPES_PER_SPONSOR) {
+    console.warn(
+      `Saved event sponsor "${sponsor.name}" (${sponsorId}) has ${sponsor.shapeCount} shapes — need ${sponsors.MIN_SHAPES_PER_SPONSOR}.`
+    );
+    return;
+  }
+  try {
+    sponsors.setActiveSponsorId(sponsorId);
+  } catch (error) {
+    console.warn(`Could not sync active sponsor from event config: ${error.message}`);
+  }
+}
+
+function applySponsorToLiveEvent(sponsor, title) {
+  const eventTitle = String(title || eventConfig.title || "").trim().slice(0, 80);
+  if (!eventTitle) {
+    return { ok: false, error: "Enter an event title before saving shapes for the live game." };
+  }
+  if (!sponsor || sponsor.shapeCount < sponsors.MIN_SHAPES_PER_SPONSOR) {
+    return {
+      ok: false,
+      error: `This sponsor needs at least ${sponsors.MIN_SHAPES_PER_SPONSOR} PNG shapes.`
+    };
+  }
+  if (game.started && !game.ended) {
+    cancelGame();
+  }
+  sponsors.setActiveSponsorId(sponsor.id);
+  eventConfig = eventBrandingStore.writeEventConfig({
+    ...eventConfig,
+    title: eventTitle,
+    sponsorId: sponsor.id,
+    sponsorName: sponsor.name
+  });
+  const payload = getEventPayload();
+  io.emit("eventBranding", payload);
+  emitGameState();
+  return { ok: true, payload };
+}
+
+syncSponsorSelectionFromEventConfig();
+
 const countriesByCode = loadCountries();
 const allowedCountryCodes = new Set(countriesByCode.keys());
 
@@ -505,11 +555,17 @@ app.use("/event-backgrounds", express.static(BACKGROUNDS_DIR, {
 }));
 
 app.get("/health", (_req, res) => {
+  const { DATA_DIR } = require("./lib/config");
   res.json({
     ok: true,
     players: players.size,
     maxPlayers: MAX_PLAYERS,
     uptime: Math.floor(process.uptime()),
+    dataDir: DATA_DIR,
+    eventSponsorId: eventConfig.sponsorId || null,
+    eventSponsorName: eventConfig.sponsorName || null,
+    activeSponsorId: sponsors.getActiveSponsorId(),
+    sponsorCount: sponsors.listSponsors().length,
     features: {
       multiCustomBackgrounds: true,
       accounts: true,
@@ -950,39 +1006,19 @@ app.patch("/api/event-branding/sponsor", (req, res) => {
     return;
   }
 
-  const title = String(eventConfig.title || "").trim();
-  if (!title) {
-    res.status(400).json({ error: "Enter an event title before saving shapes for the live game." });
-    return;
-  }
-
   const sponsor = sponsors.getSponsorById(sponsorId);
   if (!sponsor) {
     res.status(400).json({ error: "Sponsor not found." });
     return;
   }
-  if (sponsor.shapeCount < sponsors.MIN_SHAPES_PER_SPONSOR) {
-    res.status(400).json({
-      error: `This sponsor needs at least ${sponsors.MIN_SHAPES_PER_SPONSOR} PNG shapes (has ${sponsor.shapeCount}).`
-    });
+
+  const title = String(req.body?.title || eventConfig.title || "").trim();
+  const result = applySponsorToLiveEvent(sponsor, title);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
     return;
   }
-
-  if (game.started && !game.ended) {
-    cancelGame();
-  }
-
-  sponsors.setActiveSponsorId(sponsorId);
-  eventConfig = eventBrandingStore.writeEventConfig({
-    ...eventConfig,
-    title,
-    sponsorId: sponsor.id,
-    sponsorName: sponsor.name
-  });
-  const payload = getEventPayload();
-  io.emit("eventBranding", payload);
-  emitGameState();
-  res.json(payload);
+  res.json(result.payload);
 });
 
 app.put("/api/event-branding", (req, res) => {
@@ -1100,6 +1136,15 @@ app.post(
         return;
       }
       const sponsor = sponsors.addShapeFiles(req.params.id, files);
+      const activeId = sponsors.getActiveSponsorId();
+      if (
+        sponsor.id === activeId
+        && sponsor.shapeCount >= sponsors.MIN_SHAPES_PER_SPONSOR
+        && eventConfig.sponsorId !== sponsor.id
+        && String(eventConfig.title || "").trim()
+      ) {
+        applySponsorToLiveEvent(sponsor, eventConfig.title);
+      }
       res.json(sponsor);
     } catch (error) {
       res.status(400).json({ error: error.message || "Could not save shapes." });
