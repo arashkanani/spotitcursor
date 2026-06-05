@@ -21,7 +21,7 @@
     <div class="account-card card">
       <p class="event-eyebrow">Shape Match</p>
       <h1 class="account-title">Sign in to your account</h1>
-      <p class="account-note">Use Google or email. You can still host games without signing in.</p>
+      <p class="account-note">Use Google or email for your host account. <strong>Developers / admins:</strong> after sign-in go to <a href="/admin">Admin dashboard</a> (not the host access-code page).</p>
 
       <div id="googleSignInSection" class="account-google-section hidden">
         <div id="googleBtnMount" class="account-google-mount"></div>
@@ -57,14 +57,25 @@
       </form>
 
       <div class="account-footer">
-        <a href="/">← Back to host screen</a>
+        <a href="/admin">Admin dashboard</a>
+        <span aria-hidden="true"> · </span>
+        <a href="/dashboard-access">Host access code login</a>
       </div>
     </div>
   </div>
   <script src="/auth-client.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
-    const nextUrl = ShapeMatchAuth.safeNextUrl(params.get("next"));
+    const nextParam = params.get("next");
+
+    function resolveRedirect(user, fallbackNext) {
+      const safeNext = ShapeMatchAuth.safeNextUrl(fallbackNext);
+      if (user?.role === "admin" && (!nextParam || safeNext === "/")) {
+        return "/admin";
+      }
+      return safeNext;
+    }
+
     const formError = document.getElementById("formError");
     const formOk = document.getElementById("formOk");
     const loginForm = document.getElementById("loginForm");
@@ -158,9 +169,10 @@
           return;
         }
         ShapeMatchAuth.loginWithGoogle(credential)
-          .then(() => {
-            showOk("Signed in — redirecting…");
-            window.location.href = nextUrl;
+          .then((data) => {
+            const dest = resolveRedirect(data?.user, nextParam);
+            showOk(`Signed in — opening ${dest === "/admin" ? "admin dashboard" : "next page"}…`);
+            window.location.href = dest;
           })
           .catch((err) => {
             showErr(err.message || "Google sign-in failed.");
@@ -198,9 +210,10 @@
       loginBtn.disabled = true;
       loginBtn.textContent = "Signing in…";
       try {
-        await ShapeMatchAuth.login(emailCheck.email, passCheck.password);
-        showOk("Signed in — redirecting…");
-        window.location.href = nextUrl;
+        const data = await ShapeMatchAuth.login(emailCheck.email, passCheck.password);
+        const dest = resolveRedirect(data?.user, nextParam);
+        showOk(`Signed in — opening ${dest === "/admin" ? "admin dashboard" : "next page"}…`);
+        window.location.href = dest;
       } catch (err) {
         showErr(err.message || "Could not sign in.");
       } finally {
@@ -226,9 +239,10 @@
       registerBtn.disabled = true;
       registerBtn.textContent = "Creating account…";
       try {
-        await ShapeMatchAuth.register(emailCheck.email, passCheck.password);
-        showOk("Account created — redirecting…");
-        window.location.href = nextUrl;
+        const data = await ShapeMatchAuth.register(emailCheck.email, passCheck.password);
+        const dest = resolveRedirect(data?.user, nextParam);
+        showOk(`Account created — opening ${dest === "/admin" ? "admin dashboard" : "next page"}…`);
+        window.location.href = dest;
       } catch (err) {
         showErr(err.message || "Could not register.");
       } finally {
@@ -240,9 +254,10 @@
     ShapeMatchAuth.getSession()
       .then((user) => {
         if (user) {
-          showOk(`Already signed in as ${user.email}. Redirecting…`);
+          const dest = resolveRedirect(user, nextParam);
+          showOk(`Already signed in as ${user.email}. Opening ${dest === "/admin" ? "admin dashboard" : "next page"}…`);
           window.setTimeout(() => {
-            window.location.href = nextUrl;
+            window.location.href = dest;
           }, 600);
         }
       })
