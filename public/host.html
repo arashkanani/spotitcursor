@@ -75,7 +75,7 @@
 
           <div class="setup-section">
             <h3 class="setup-section-title">Wall screen (2 LCDs)</h3>
-            <p class="setup-hint">Connect two displays in <strong>Extend</strong> mode (Win + P). Pick <strong>Side by side</strong> or <strong>Stacked</strong> to match your physical setup. In the lobby or live game, click <strong>Span across 2 screens</strong> — do <strong>not</strong> use F11 (on Windows it only fills one monitor). The preview line marks where the screens meet.</p>
+            <p class="setup-hint">Connect two displays in <strong>Extend</strong> mode (Win + P). Pick <strong>Side by side</strong> or <strong>Stacked</strong>. In the lobby, click <strong>Open wall window (2 screens)</strong> and allow <strong>popups</strong>. Use that new window on your LCDs — do <strong>not</strong> use F11.</p>
             <div id="wallScreenPicker" class="wall-screen-option-grid" role="radiogroup" aria-label="Wall screen layout">
               <button type="button" class="wall-screen-option is-selected" data-wall-layout="single" role="radio" aria-checked="true">
                 <span class="wall-screen-icon wall-screen-icon-single" aria-hidden="true"></span>
@@ -265,8 +265,8 @@
       </div>
 
       <div id="wallDisplayBar" class="wall-display-bar hidden">
-        <p class="wall-display-hint">Two LCD wall mode — <strong>F11 fills only one screen</strong> on Windows. Click below after both monitors are connected in Extend mode.</p>
-        <button type="button" id="wallDisplayBtn" class="start-game-btn">Span across 2 screens</button>
+        <p class="wall-display-hint">Two LCD wall mode — <strong>F11 fills only one screen</strong> on Windows. Click below to open a wall window. <strong>Allow popups</strong> for this site if asked.</p>
+        <button type="button" id="wallDisplayBtn" class="start-game-btn">Open wall window (2 screens)</button>
         <p id="wallDisplayStatus" class="wall-display-status setup-hint" role="status"></p>
       </div>
 
@@ -980,6 +980,35 @@
       };
     }
 
+    const WALL_POPUP_NAME = "shapematch-wall";
+
+    function isWallPopup() {
+      return new URLSearchParams(window.location.search).get("wall") === "1";
+    }
+
+    function estimateDualMonitorBounds() {
+      const layout = normalizeWallScreenLayout(wallScreenLayout);
+      const left = Number.isFinite(window.screen?.availLeft) ? window.screen.availLeft : 0;
+      const top = Number.isFinite(window.screen?.availTop) ? window.screen.availTop : 0;
+      const availW = window.screen?.availWidth || 1920;
+      const availH = window.screen?.availHeight || 1080;
+      let width = availW;
+      let height = availH;
+      if (layout === "horizontal") {
+        width = availW * 2;
+      } else if (layout === "vertical") {
+        height = availH * 2;
+      }
+      return {
+        left,
+        top,
+        width,
+        height,
+        screenCount: 2,
+        estimated: true
+      };
+    }
+
     async function getVirtualDesktopBounds() {
       if (typeof window.getScreenDetails === "function") {
         try {
@@ -1002,7 +1031,8 @@
                 top,
                 width: right - left,
                 height: bottom - top,
-                screenCount: screens.length
+                screenCount: screens.length,
+                estimated: false
               };
             }
           }
@@ -1011,58 +1041,128 @@
         }
       }
 
-      return {
-        left: window.screen.availLeft || 0,
-        top: window.screen.availTop || 0,
-        width: window.screen.availWidth || window.innerWidth,
-        height: window.screen.availHeight || window.innerHeight,
-        screenCount: 1
-      };
+      return estimateDualMonitorBounds();
     }
 
-    function setWallDisplayStatus(message) {
-      if (wallDisplayStatus) wallDisplayStatus.textContent = message || "";
+    function buildPopupFeatureString(bounds) {
+      return [
+        "popup=yes",
+        `left=${Math.round(bounds.left)}`,
+        `top=${Math.round(bounds.top)}`,
+        `width=${Math.round(bounds.width)}`,
+        `height=${Math.round(bounds.height)}`,
+        "menubar=no",
+        "toolbar=no",
+        "location=no",
+        "status=no",
+        "resizable=yes",
+        "scrollbars=yes"
+      ].join(",");
     }
 
-    async function enterWallDisplay() {
-      const layout = normalizeWallScreenLayout(wallScreenLayout);
-      if (layout === DEFAULT_WALL_SCREEN_LAYOUT) {
-        setWallDisplayStatus("Choose Side by side or Stacked under Wall screen first.");
-        return;
-      }
+    function verifyWindowBounds(bounds) {
+      const widthOk = Math.abs(window.outerWidth - bounds.width) <= 140;
+      const heightOk = Math.abs(window.outerHeight - bounds.height) <= 140;
+      return widthOk && heightOk;
+    }
 
-      setWallDisplayStatus("Stretching window across displays…");
-      const bounds = await getVirtualDesktopBounds();
-
-      try {
-        window.moveTo(bounds.left, bounds.top);
-        window.resizeTo(bounds.width, bounds.height);
-      } catch (_err) {
-        setWallDisplayStatus(
-          "Browser blocked auto-resize. Drag the window edges manually so it covers both LCDs edge to edge (do not use F11)."
-        );
-        return;
-      }
-
+    function afterWallSpanLayout() {
       document.body.classList.add("wall-display-active");
-      syncWallScreenLayoutAttributes();
-
-      if (bounds.screenCount >= 2) {
-        setWallDisplayStatus(
-          "Window spans both screens. Hide the taskbar if needed. Do not press F11 — it will shrink to one monitor."
-        );
-      } else {
-        setWallDisplayStatus(
-          "Could not detect 2 screens automatically. Drag the browser window so it covers both LCDs completely. Avoid F11 on Windows."
-        );
+      if (isWallPopup()) {
+        document.body.classList.add("wall-popup-mode");
       }
-
+      syncWallScreenLayoutAttributes();
       window.setTimeout(() => {
         window.dispatchEvent(new Event("resize"));
         fitSetupPreviewScale();
         repositionDemoCircleShapes();
         refreshCircleShapesDisplay();
       }, 200);
+    }
+
+    function setWallDisplayStatus(message) {
+      if (wallDisplayStatus) wallDisplayStatus.textContent = message || "";
+    }
+
+    async function applyWallSpanToWindow(targetWindow) {
+      const win = targetWindow || window;
+      let bounds = await getVirtualDesktopBounds();
+      if (bounds.screenCount < 2) {
+        bounds = estimateDualMonitorBounds();
+      }
+
+      try {
+        win.moveTo(bounds.left, bounds.top);
+      } catch (_err) {
+        // Blocked in some browsers.
+      }
+
+      try {
+        win.resizeTo(bounds.width, bounds.height);
+      } catch (_err) {
+        // Blocked in some browsers.
+      }
+
+      if (win === window) {
+        afterWallSpanLayout();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        if (verifyWindowBounds(bounds)) {
+          setWallDisplayStatus(
+            "Wall window is stretched across your displays. Do not press F11."
+          );
+          return true;
+        }
+        setWallDisplayStatus(
+          "Browser blocked auto-resize. Drag this window’s corners until both LCDs are covered. Do not use F11."
+        );
+        return false;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return true;
+    }
+
+    function enterWallDisplay() {
+      const layout = normalizeWallScreenLayout(wallScreenLayout);
+      if (layout === DEFAULT_WALL_SCREEN_LAYOUT) {
+        setWallDisplayStatus("Choose Side by side or Stacked under Wall screen first.");
+        return;
+      }
+
+      if (isWallPopup()) {
+        setWallDisplayStatus("Stretching wall window…");
+        void applyWallSpanToWindow(window);
+        return;
+      }
+
+      const estimate = estimateDualMonitorBounds();
+      const target = new URL(window.location.href);
+      target.searchParams.set("wall", "1");
+      const popup = window.open(
+        target.toString(),
+        WALL_POPUP_NAME,
+        buildPopupFeatureString(estimate)
+      );
+
+      if (!popup || popup.closed) {
+        setWallDisplayStatus(
+          "Popup blocked — click the blocked-popup icon in the address bar, allow popups, then try again. Trying this window instead…"
+        );
+        void applyWallSpanToWindow(window);
+        return;
+      }
+
+      try {
+        popup.focus();
+      } catch (_err) {
+        // Ignore focus errors.
+      }
+
+      setWallDisplayStatus(
+        "Wall window opened. If Chrome asks, allow popups and window-management permission."
+      );
+
+      void applyWallSpanToWindow(popup);
     }
 
     function syncWallDisplayChrome() {
@@ -3554,6 +3654,15 @@
     });
 
     startBtn.disabled = true;
+
+    if (isWallPopup()) {
+      document.body.classList.add("wall-popup-mode");
+      const hostTopBar = document.querySelector(".host-top-bar");
+      hostTopBar?.classList.add("hidden");
+      window.addEventListener("load", () => {
+        void applyWallSpanToWindow(window);
+      });
+    }
   </script>
 </body>
 </html>

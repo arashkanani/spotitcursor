@@ -3393,6 +3393,14 @@ body.wall-display-active .page {
   padding: 0.75rem 1rem 1rem;
 }
 
+body.wall-popup-mode .host-top-bar {
+  display: none;
+}
+
+body.wall-popup-mode .page {
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
 .wall-screen-option-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
