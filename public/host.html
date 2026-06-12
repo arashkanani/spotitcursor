@@ -73,6 +73,28 @@
             </label>
           </div>
 
+          <div class="setup-section">
+            <h3 class="setup-section-title">Wall screen (2 LCDs)</h3>
+            <p class="setup-hint">Connect two displays to your laptop in <strong>Extend</strong> mode. Pick how they are arranged side-by-side or stacked, then drag the browser across both screens and press <strong>F11</strong> for fullscreen. The preview line marks where the screens meet.</p>
+            <div id="wallScreenPicker" class="wall-screen-option-grid" role="radiogroup" aria-label="Wall screen layout">
+              <button type="button" class="wall-screen-option is-selected" data-wall-layout="single" role="radio" aria-checked="true">
+                <span class="wall-screen-icon wall-screen-icon-single" aria-hidden="true"></span>
+                <span class="wall-screen-option-name">Single screen</span>
+                <span class="wall-screen-option-desc">Laptop only</span>
+              </button>
+              <button type="button" class="wall-screen-option" data-wall-layout="horizontal" role="radio" aria-checked="false">
+                <span class="wall-screen-icon wall-screen-icon-horizontal" aria-hidden="true"></span>
+                <span class="wall-screen-option-name">Side by side</span>
+                <span class="wall-screen-option-desc">2 LCDs — horizontal</span>
+              </button>
+              <button type="button" class="wall-screen-option" data-wall-layout="vertical" role="radio" aria-checked="false">
+                <span class="wall-screen-icon wall-screen-icon-vertical" aria-hidden="true"></span>
+                <span class="wall-screen-option-name">Stacked</span>
+                <span class="wall-screen-option-desc">2 LCDs — vertical</span>
+              </button>
+            </div>
+          </div>
+
           <div id="sponsorLibraryPanel" class="customize-sponsor-block">
             <div class="setup-section-head">
               <h3 class="setup-section-title">Sponsor shape pack</h3>
@@ -98,6 +120,7 @@
           <div id="setupLiveDemo" class="setup-live-demo setup-game-preview-panel card" data-pattern="classic">
             <div class="setup-preview-viewport">
               <div class="setup-preview-frame">
+              <div id="setupPreviewBezel" class="setup-preview-bezel hidden" aria-hidden="true"></div>
               <div id="setupPreviewScene" class="setup-preview-scene" data-bg="midnight" data-pattern="classic">
                 <div class="setup-preview-bg" aria-hidden="true"></div>
                 <img id="setupPreviewBgImg" class="setup-preview-bg-img" alt="" hidden>
@@ -247,6 +270,7 @@
     </section>
 
     <section id="gameView" class="host-game hidden">
+      <div id="gameWallBezel" class="wall-screen-bezel hidden" aria-hidden="true"></div>
       <header class="event-branding-bar game-branding-bar">
         <div class="event-branding-main">
           <p class="event-eyebrow">Live Event</p>
@@ -430,6 +454,9 @@
     const customBackgroundStatus = document.getElementById("customBackgroundStatus");
     const circlesPanelTransparentInput = document.getElementById("circlesPanelTransparent");
     const rankingPanelTransparentInput = document.getElementById("rankingPanelTransparent");
+    const wallScreenPicker = document.getElementById("wallScreenPicker");
+    const setupPreviewBezel = document.getElementById("setupPreviewBezel");
+    const gameWallBezel = document.getElementById("gameWallBezel");
     const editMinShapesInline = document.getElementById("editMinShapesInline");
     const newSponsorBtn = document.getElementById("newSponsorBtn");
     const editBackBtn = document.getElementById("editBackBtn");
@@ -458,6 +485,8 @@
     const setupPreviewFrame = setupLiveDemo?.querySelector(".setup-preview-frame");
     const SETUP_PREVIEW_REF_WIDTH = 1080;
     const SETUP_PREVIEW_REF_HEIGHT = 620;
+    const WALL_SCREEN_LAYOUTS = new Set(["single", "horizontal", "vertical"]);
+    const DEFAULT_WALL_SCREEN_LAYOUT = "single";
     const SETUP_PREVIEW_SCALE_TARGET = 0.42;
     const SETUP_PREVIEW_SCALE_MAX = 0.58;
     const demoLeftCircle = document.getElementById("demoLeftCircle");
@@ -595,6 +624,7 @@
     const optimisticBackgroundBlobUrls = new Map();
     let circlesPanelTransparent = false;
     let rankingPanelTransparent = false;
+    let wallScreenLayout = DEFAULT_WALL_SCREEN_LAYOUT;
     let setupPhase = "customize";
 
     const DEFAULT_THEME_BACKGROUND = "midnight";
@@ -915,11 +945,74 @@
       return targets;
     }
 
+    function normalizeWallScreenLayout(value) {
+      const layout = String(value || "").trim().toLowerCase();
+      return WALL_SCREEN_LAYOUTS.has(layout) ? layout : DEFAULT_WALL_SCREEN_LAYOUT;
+    }
+
     function getSetupPreviewReferenceSize() {
+      if (wallScreenLayout === "horizontal") {
+        return {
+          width: SETUP_PREVIEW_REF_WIDTH * 2,
+          height: SETUP_PREVIEW_REF_HEIGHT
+        };
+      }
+      if (wallScreenLayout === "vertical") {
+        return {
+          width: SETUP_PREVIEW_REF_WIDTH,
+          height: SETUP_PREVIEW_REF_HEIGHT * 2
+        };
+      }
       return {
         width: SETUP_PREVIEW_REF_WIDTH,
         height: SETUP_PREVIEW_REF_HEIGHT
       };
+    }
+
+    function syncWallScreenLayoutAttributes() {
+      const layout = normalizeWallScreenLayout(wallScreenLayout);
+      const targets = [
+        document.documentElement,
+        document.body,
+        setupPreviewScene,
+        setupLiveDemo,
+        lobbyView,
+        gameView
+      ];
+      for (const el of targets) {
+        if (!el) continue;
+        el.dataset.wallLayout = layout;
+      }
+
+      const showBezel = layout !== DEFAULT_WALL_SCREEN_LAYOUT;
+      if (setupPreviewBezel) {
+        const showPreviewBezel = showBezel && setupPhase === "customize";
+        setupPreviewBezel.classList.toggle("hidden", !showPreviewBezel);
+        setupPreviewBezel.dataset.orientation = layout === "vertical" ? "vertical" : "horizontal";
+      }
+      if (gameWallBezel) {
+        const showGameBezel = showBezel && gameView && !gameView.classList.contains("hidden");
+        gameWallBezel.classList.toggle("hidden", !showGameBezel);
+        gameWallBezel.dataset.orientation = layout === "vertical" ? "vertical" : "horizontal";
+      }
+    }
+
+    function syncWallScreenPickerUi() {
+      if (!wallScreenPicker) return;
+      const layout = normalizeWallScreenLayout(wallScreenLayout);
+      wallScreenPicker.querySelectorAll(".wall-screen-option").forEach((btn) => {
+        const on = btn.dataset.wallLayout === layout;
+        btn.classList.toggle("is-selected", on);
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+      });
+    }
+
+    function applyWallScreenLayout(branding) {
+      if (branding?.wallScreenLayout !== undefined) {
+        wallScreenLayout = normalizeWallScreenLayout(branding.wallScreenLayout);
+      }
+      syncWallScreenLayoutAttributes();
+      syncWallScreenPickerUi();
     }
 
     function fitSetupPreviewScale() {
@@ -931,10 +1024,9 @@
         setupPreviewViewport.offsetParent?.clientWidth || 0,
         320
       );
-      const heightBudget = Math.min(
-        Math.max(260, window.innerHeight * 0.42),
-        520
-      );
+      const heightBudget = wallScreenLayout === "vertical"
+        ? Math.min(Math.max(340, window.innerHeight * 0.55), 680)
+        : Math.min(Math.max(260, window.innerHeight * 0.42), 520);
       const scaleToFit = Math.min(
         panelWidth / ref.width,
         heightBudget / ref.height
@@ -1532,6 +1624,7 @@
             themeBackground: getPresetThemeBackground(),
             circlesPanelTransparent,
             rankingPanelTransparent,
+            wallScreenLayout,
             ...getBackgroundTransformPayload()
           })
         });
@@ -1738,6 +1831,7 @@
       }
       renderCustomBackgroundList();
       applyPanelStyle(branding);
+      applyWallScreenLayout(branding);
       refreshAdBackgroundPlayback();
       const sponsorLabel = branding?.sponsorName
         ? `Shapes by ${branding.sponsorName}`
@@ -2331,10 +2425,23 @@
         customBackgroundUrls,
         customBackgrounds,
         circlesPanelTransparent,
-        rankingPanelTransparent
+        rankingPanelTransparent,
+        wallScreenLayout
       });
       refreshDashboardPreview();
     }
+
+    wallScreenPicker?.addEventListener("click", (event) => {
+      const btn = event.target.closest(".wall-screen-option");
+      if (!btn || !wallScreenPicker.contains(btn)) return;
+      const next = normalizeWallScreenLayout(btn.dataset.wallLayout);
+      if (next === wallScreenLayout) return;
+      wallScreenLayout = next;
+      syncWallScreenLayoutAttributes();
+      syncWallScreenPickerUi();
+      updateSetupPreview();
+      void persistThemeSelection();
+    });
 
     circlesPanelTransparentInput?.addEventListener("change", () => {
       circlesPanelTransparent = circlesPanelTransparentInput.checked;
@@ -2356,6 +2463,7 @@
       lobbyView.classList.add("hidden");
       gameView.classList.add("hidden");
       showSetupPhase("customize");
+      syncWallScreenLayoutAttributes();
       refreshAdBackgroundPlayback();
     }
 
@@ -2365,6 +2473,7 @@
       lobbyView.classList.remove("hidden");
       gameView.classList.add("hidden");
       syncPanelStyleAttributes();
+      syncWallScreenLayoutAttributes();
       renderLobbyPlayers(latestLeaderboard);
       applyGameTheme(
         FIXED_THEME_PATTERN,
@@ -2380,6 +2489,7 @@
       lobbyView.classList.add("hidden");
       gameView.classList.remove("hidden");
       syncPanelStyleAttributes();
+      syncWallScreenLayoutAttributes();
       refreshAdBackgroundPlayback();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -2485,7 +2595,8 @@
             customBackgrounds: customBackgrounds,
             ...getBackgroundTransformPayload(),
             circlesPanelTransparent,
-            rankingPanelTransparent
+            rankingPanelTransparent,
+            wallScreenLayout
           })
         });
         const data = await res.json();
