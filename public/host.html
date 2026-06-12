@@ -75,7 +75,7 @@
 
           <div class="setup-section">
             <h3 class="setup-section-title">Wall screen (2 LCDs)</h3>
-            <p class="setup-hint">Connect two displays to your laptop in <strong>Extend</strong> mode. Pick how they are arranged side-by-side or stacked, then drag the browser across both screens and press <strong>F11</strong> for fullscreen. The preview line marks where the screens meet.</p>
+            <p class="setup-hint">Connect two displays in <strong>Extend</strong> mode (Win + P). Pick <strong>Side by side</strong> or <strong>Stacked</strong> to match your physical setup. In the lobby or live game, click <strong>Span across 2 screens</strong> — do <strong>not</strong> use F11 (on Windows it only fills one monitor). The preview line marks where the screens meet.</p>
             <div id="wallScreenPicker" class="wall-screen-option-grid" role="radiogroup" aria-label="Wall screen layout">
               <button type="button" class="wall-screen-option is-selected" data-wall-layout="single" role="radio" aria-checked="true">
                 <span class="wall-screen-icon wall-screen-icon-single" aria-hidden="true"></span>
@@ -264,6 +264,12 @@
         </div>
       </div>
 
+      <div id="wallDisplayBar" class="wall-display-bar hidden">
+        <p class="wall-display-hint">Two LCD wall mode — <strong>F11 fills only one screen</strong> on Windows. Click below after both monitors are connected in Extend mode.</p>
+        <button type="button" id="wallDisplayBtn" class="start-game-btn">Span across 2 screens</button>
+        <p id="wallDisplayStatus" class="wall-display-status setup-hint" role="status"></p>
+      </div>
+
       <div class="lobby-actions">
         <button id="startBtn" class="start-game-btn">Start 20-Round Game</button>
       </div>
@@ -277,6 +283,7 @@
           <h2 class="event-title" data-event-title>Shape Match</h2>
           <p class="event-sponsor-line" data-event-sponsor hidden></p>
         </div>
+        <button type="button" id="wallDisplayBtnGame" class="edit-event-btn wall-display-btn-game hidden" title="Stretch browser across both LCDs">⛶ Span 2 screens</button>
         <button type="button" id="backToMenuBtn" class="edit-event-btn" title="End game and return to event setup">← Main menu</button>
         <div class="round-pill game-status-pill" id="statusText">
           <span class="game-status-round" id="gameStatusRound">Round 1 / 20</span>
@@ -457,6 +464,10 @@
     const wallScreenPicker = document.getElementById("wallScreenPicker");
     const setupPreviewBezel = document.getElementById("setupPreviewBezel");
     const gameWallBezel = document.getElementById("gameWallBezel");
+    const wallDisplayBar = document.getElementById("wallDisplayBar");
+    const wallDisplayBtn = document.getElementById("wallDisplayBtn");
+    const wallDisplayBtnGame = document.getElementById("wallDisplayBtnGame");
+    const wallDisplayStatus = document.getElementById("wallDisplayStatus");
     const editMinShapesInline = document.getElementById("editMinShapesInline");
     const newSponsorBtn = document.getElementById("newSponsorBtn");
     const editBackBtn = document.getElementById("editBackBtn");
@@ -969,6 +980,98 @@
       };
     }
 
+    async function getVirtualDesktopBounds() {
+      if (typeof window.getScreenDetails === "function") {
+        try {
+          const details = await window.getScreenDetails();
+          const screens = Array.isArray(details?.screens) ? details.screens : [];
+          if (screens.length >= 2) {
+            let left = Infinity;
+            let top = Infinity;
+            let right = -Infinity;
+            let bottom = -Infinity;
+            for (const screen of screens) {
+              left = Math.min(left, screen.availLeft);
+              top = Math.min(top, screen.availTop);
+              right = Math.max(right, screen.availLeft + screen.availWidth);
+              bottom = Math.max(bottom, screen.availTop + screen.availHeight);
+            }
+            if (Number.isFinite(left) && right > left && bottom > top) {
+              return {
+                left,
+                top,
+                width: right - left,
+                height: bottom - top,
+                screenCount: screens.length
+              };
+            }
+          }
+        } catch (_err) {
+          // Permission denied or API unavailable — fall through.
+        }
+      }
+
+      return {
+        left: window.screen.availLeft || 0,
+        top: window.screen.availTop || 0,
+        width: window.screen.availWidth || window.innerWidth,
+        height: window.screen.availHeight || window.innerHeight,
+        screenCount: 1
+      };
+    }
+
+    function setWallDisplayStatus(message) {
+      if (wallDisplayStatus) wallDisplayStatus.textContent = message || "";
+    }
+
+    async function enterWallDisplay() {
+      const layout = normalizeWallScreenLayout(wallScreenLayout);
+      if (layout === DEFAULT_WALL_SCREEN_LAYOUT) {
+        setWallDisplayStatus("Choose Side by side or Stacked under Wall screen first.");
+        return;
+      }
+
+      setWallDisplayStatus("Stretching window across displays…");
+      const bounds = await getVirtualDesktopBounds();
+
+      try {
+        window.moveTo(bounds.left, bounds.top);
+        window.resizeTo(bounds.width, bounds.height);
+      } catch (_err) {
+        setWallDisplayStatus(
+          "Browser blocked auto-resize. Drag the window edges manually so it covers both LCDs edge to edge (do not use F11)."
+        );
+        return;
+      }
+
+      document.body.classList.add("wall-display-active");
+      syncWallScreenLayoutAttributes();
+
+      if (bounds.screenCount >= 2) {
+        setWallDisplayStatus(
+          "Window spans both screens. Hide the taskbar if needed. Do not press F11 — it will shrink to one monitor."
+        );
+      } else {
+        setWallDisplayStatus(
+          "Could not detect 2 screens automatically. Drag the browser window so it covers both LCDs completely. Avoid F11 on Windows."
+        );
+      }
+
+      window.setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+        fitSetupPreviewScale();
+        repositionDemoCircleShapes();
+        refreshCircleShapesDisplay();
+      }, 200);
+    }
+
+    function syncWallDisplayChrome() {
+      const layout = normalizeWallScreenLayout(wallScreenLayout);
+      const wallMode = layout !== DEFAULT_WALL_SCREEN_LAYOUT;
+      wallDisplayBar?.classList.toggle("hidden", !wallMode);
+      wallDisplayBtnGame?.classList.toggle("hidden", !wallMode);
+    }
+
     function syncWallScreenLayoutAttributes() {
       const layout = normalizeWallScreenLayout(wallScreenLayout);
       const targets = [
@@ -983,6 +1086,8 @@
         if (!el) continue;
         el.dataset.wallLayout = layout;
       }
+
+      syncWallDisplayChrome();
 
       const showBezel = layout !== DEFAULT_WALL_SCREEN_LAYOUT;
       if (setupPreviewBezel) {
@@ -2441,6 +2546,13 @@
       syncWallScreenPickerUi();
       updateSetupPreview();
       void persistThemeSelection();
+    });
+
+    wallDisplayBtn?.addEventListener("click", () => {
+      void enterWallDisplay();
+    });
+    wallDisplayBtnGame?.addEventListener("click", () => {
+      void enterWallDisplay();
     });
 
     circlesPanelTransparentInput?.addEventListener("change", () => {
