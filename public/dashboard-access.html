@@ -17,6 +17,7 @@
       <p class="event-eyebrow">Shape Match</p>
       <h1 class="account-title">Game Dashboard Access</h1>
       <p class="account-note">Sign in using the access username and password provided by your admin.</p>
+      <p id="debugHint" class="account-note hidden">Local debug: use username <strong>abc</strong> and password <strong>123</strong>.</p>
       <div id="formError" class="account-alert err hidden" role="alert"></div>
       <div id="formOk" class="account-alert ok hidden" role="status"></div>
       <form id="accessForm" class="account-form" autocomplete="off">
@@ -44,6 +45,9 @@
     const btn = document.getElementById("accessBtn");
     const errEl = document.getElementById("formError");
     const okEl = document.getElementById("formOk");
+    const debugHintEl = document.getElementById("debugHint");
+    const usernameInput = document.getElementById("accessUsername");
+    const passwordInput = document.getElementById("accessPassword");
 
     function showErr(msg) {
       if (!msg) {
@@ -65,6 +69,19 @@
       errEl.classList.add("hidden");
       okEl.textContent = msg;
       okEl.classList.remove("hidden");
+    }
+
+    async function applyDebugHint() {
+      try {
+        const res = await fetch("/api/access/debug-hint");
+        const data = await res.json();
+        if (!data?.username || !data?.password) return;
+        if (debugHintEl) debugHintEl.classList.remove("hidden");
+        if (usernameInput && !usernameInput.value) usernameInput.value = data.username;
+        if (passwordInput && !passwordInput.value) passwordInput.value = data.password;
+      } catch (_error) {
+        // ignore
+      }
     }
 
     async function checkExistingSession() {
@@ -113,6 +130,7 @@
       }
     });
 
+    applyDebugHint();
     checkExistingSession();
   </script>
 </body>

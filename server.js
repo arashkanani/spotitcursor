@@ -680,6 +680,10 @@ app.get("/api/auth/me", (req, res) => {
   res.json({ user: req.user });
 });
 
+app.get("/api/access/debug-hint", (_req, res) => {
+  res.json(userStore.getDebugAccessHint() || { debug: false });
+});
+
 app.get("/api/access/me", (req, res) => {
   if (!req.dashboardAccess?.code) {
     res.json({ access: null, realGameRunning: isRealGameRunning() });
