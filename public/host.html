@@ -73,6 +73,33 @@
             </label>
           </div>
 
+          <div class="setup-section">
+            <h3 class="setup-section-title">Circle size</h3>
+            <p class="setup-hint">Make the matching circles bigger so the audience can see them from far away. The live preview updates instantly.</p>
+            <div id="circleSizePicker" class="circle-size-option-grid" role="radiogroup" aria-label="Circle size">
+              <button type="button" class="circle-size-option is-selected" data-circle-size="standard" role="radio" aria-checked="true">
+                <span class="circle-size-preview circle-size-preview-standard" aria-hidden="true"></span>
+                <span class="circle-size-option-name">Standard</span>
+                <span class="circle-size-option-desc">Normal screen</span>
+              </button>
+              <button type="button" class="circle-size-option" data-circle-size="large" role="radio" aria-checked="false">
+                <span class="circle-size-preview circle-size-preview-large" aria-hidden="true"></span>
+                <span class="circle-size-option-name">Large</span>
+                <span class="circle-size-option-desc">Medium room</span>
+              </button>
+              <button type="button" class="circle-size-option" data-circle-size="xlarge" role="radio" aria-checked="false">
+                <span class="circle-size-preview circle-size-preview-xlarge" aria-hidden="true"></span>
+                <span class="circle-size-option-name">Extra large</span>
+                <span class="circle-size-option-desc">Back of hall</span>
+              </button>
+              <button type="button" class="circle-size-option" data-circle-size="venue" role="radio" aria-checked="false">
+                <span class="circle-size-preview circle-size-preview-venue" aria-hidden="true"></span>
+                <span class="circle-size-option-name">Venue / wall</span>
+                <span class="circle-size-option-desc">Maximum size</span>
+              </button>
+            </div>
+          </div>
+
           <div id="sponsorLibraryPanel" class="customize-sponsor-block">
             <div class="setup-section-head">
               <h3 class="setup-section-title">Sponsor shape pack</h3>
@@ -430,6 +457,7 @@
     const customBackgroundStatus = document.getElementById("customBackgroundStatus");
     const circlesPanelTransparentInput = document.getElementById("circlesPanelTransparent");
     const rankingPanelTransparentInput = document.getElementById("rankingPanelTransparent");
+    const circleSizePicker = document.getElementById("circleSizePicker");
     const editMinShapesInline = document.getElementById("editMinShapesInline");
     const newSponsorBtn = document.getElementById("newSponsorBtn");
     const editBackBtn = document.getElementById("editBackBtn");
@@ -595,6 +623,8 @@
     const optimisticBackgroundBlobUrls = new Map();
     let circlesPanelTransparent = false;
     let rankingPanelTransparent = false;
+    let circleSize = "standard";
+    const CIRCLE_SIZE_OPTIONS = new Set(["standard", "large", "xlarge", "venue"]);
     let setupPhase = "customize";
 
     const DEFAULT_THEME_BACKGROUND = "midnight";
@@ -1532,6 +1562,7 @@
             themeBackground: getPresetThemeBackground(),
             circlesPanelTransparent,
             rankingPanelTransparent,
+            circleSize,
             ...getBackgroundTransformPayload()
           })
         });
@@ -1551,6 +1582,58 @@
       }
     }
 
+    function normalizeCircleSize(value) {
+      const size = String(value || "").trim().toLowerCase();
+      return CIRCLE_SIZE_OPTIONS.has(size) ? size : "standard";
+    }
+
+    function syncCircleSizeAttributes() {
+      const size = normalizeCircleSize(circleSize);
+      const targets = [
+        document.documentElement,
+        document.body,
+        setupPreviewScene,
+        setupLiveDemo,
+        lobbyView,
+        gameView
+      ];
+      for (const el of targets) {
+        if (!el) continue;
+        el.dataset.circleSize = size;
+      }
+    }
+
+    function syncCircleSizePickerUi() {
+      if (!circleSizePicker) return;
+      const size = normalizeCircleSize(circleSize);
+      circleSizePicker.querySelectorAll(".circle-size-option").forEach((btn) => {
+        const on = btn.dataset.circleSize === size;
+        btn.classList.toggle("is-selected", on);
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+      });
+    }
+
+    function applyCircleSize(branding) {
+      if (branding?.circleSize !== undefined) {
+        circleSize = normalizeCircleSize(branding.circleSize);
+      }
+      syncCircleSizeAttributes();
+      syncCircleSizePickerUi();
+    }
+
+    function refreshCircleLayoutAfterSizeChange() {
+      for (const circleEl of [demoLeftCircle, demoRightCircle, leftCircle, rightCircle]) {
+        if (!circleEl) continue;
+        circleEl._shapeLayoutLocked = false;
+        circleEl._shapeDisplayCache = null;
+      }
+      if (setupPhase === "customize") {
+        scheduleDashboardPreview();
+      } else if (!gameView.classList.contains("hidden")) {
+        refreshCircleShapesDisplay();
+      }
+    }
+
     function syncPanelStyleAttributes() {
       const circlesMode = circlesPanelTransparent ? "transparent" : "solid";
       const rankingMode = rankingPanelTransparent ? "transparent" : "solid";
@@ -1566,6 +1649,7 @@
         if (!el) continue;
         el.dataset.circlesPanel = circlesMode;
         el.dataset.rankingPanel = rankingMode;
+        el.dataset.circleSize = normalizeCircleSize(circleSize);
       }
     }
 
@@ -1585,6 +1669,11 @@
       if (rankingPanelTransparentInput) {
         rankingPanelTransparentInput.checked = rankingPanelTransparent;
       }
+    }
+
+    function applyDisplaySettings(branding) {
+      applyPanelStyle(branding);
+      applyCircleSize(branding);
     }
 
     function needsEventSetup(branding) {
@@ -1737,7 +1826,7 @@
         console.error("applyGameTheme failed", err);
       }
       renderCustomBackgroundList();
-      applyPanelStyle(branding);
+      applyDisplaySettings(branding);
       refreshAdBackgroundPlayback();
       const sponsorLabel = branding?.sponsorName
         ? `Shapes by ${branding.sponsorName}`
@@ -2342,10 +2431,24 @@
         customBackgroundUrls,
         customBackgrounds,
         circlesPanelTransparent,
-        rankingPanelTransparent
+        rankingPanelTransparent,
+        circleSize
       });
       refreshDashboardPreview();
     }
+
+    circleSizePicker?.addEventListener("click", (event) => {
+      const btn = event.target.closest(".circle-size-option");
+      if (!btn || !circleSizePicker.contains(btn)) return;
+      const next = normalizeCircleSize(btn.dataset.circleSize);
+      if (next === circleSize) return;
+      circleSize = next;
+      syncCircleSizeAttributes();
+      syncCircleSizePickerUi();
+      updateSetupPreview();
+      refreshCircleLayoutAfterSizeChange();
+      void persistThemeSelection();
+    });
 
     circlesPanelTransparentInput?.addEventListener("change", () => {
       circlesPanelTransparent = circlesPanelTransparentInput.checked;
@@ -2496,7 +2599,8 @@
             customBackgrounds: customBackgrounds,
             ...getBackgroundTransformPayload(),
             circlesPanelTransparent,
-            rankingPanelTransparent
+            rankingPanelTransparent,
+            circleSize
           })
         });
         const data = await res.json();

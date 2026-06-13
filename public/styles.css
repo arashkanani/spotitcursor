@@ -330,8 +330,8 @@ button:disabled {
 }
 
 .circle {
-  width: min(44vw, 45vh, 480px);
-  height: min(44vw, 45vh, 480px);
+  width: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
+  height: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
   margin: 0 auto;
   border: 2px solid rgba(139, 124, 248, 0.5);
   border-radius: 999px;
@@ -376,8 +376,8 @@ button:disabled {
 
 .host-game .circle {
   aspect-ratio: 1;
-  min-width: 240px;
-  min-height: 240px;
+  min-width: var(--game-circle-min, 240px);
+  min-height: var(--game-circle-min, 240px);
   flex-shrink: 0;
 }
 
@@ -2423,8 +2423,8 @@ input::placeholder {
 }
 
 .setup-game-preview-panel .setup-preview-inner .circle {
-  width: 260px;
-  height: 260px;
+  width: var(--preview-circle-size, 260px);
+  height: var(--preview-circle-size, 260px);
   aspect-ratio: 1;
   min-width: 0;
   min-height: 0;
@@ -2882,8 +2882,8 @@ body[data-pattern="spotlight"] .setup-preview-inner .layout {
 
 body[data-pattern="spotlight"] .host-game .circle,
 body[data-pattern="spotlight"] .setup-preview-inner .circle {
-  width: 260px;
-  height: 260px;
+  width: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
+  height: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
 }
 
 body[data-pattern="stage"] .host-game .layout,
@@ -3352,4 +3352,125 @@ body.admin-body {
   color: var(--text-muted);
   font-style: italic;
   padding: 1.25rem 0.5rem !important;
+}
+
+/* ——— Circle size presets ——— */
+:root,
+[data-circle-size="standard"] {
+  --game-circle-vw: 44;
+  --game-circle-vh: 45;
+  --game-circle-max: 480px;
+  --game-circle-min: 240px;
+  --preview-circle-size: 260px;
+}
+
+[data-circle-size="large"] {
+  --game-circle-vw: 52;
+  --game-circle-vh: 54;
+  --game-circle-max: 560px;
+  --game-circle-min: 280px;
+  --preview-circle-size: 300px;
+}
+
+[data-circle-size="xlarge"] {
+  --game-circle-vw: 62;
+  --game-circle-vh: 64;
+  --game-circle-max: 660px;
+  --game-circle-min: 320px;
+  --preview-circle-size: 350px;
+}
+
+[data-circle-size="venue"] {
+  --game-circle-vw: 72;
+  --game-circle-vh: 74;
+  --game-circle-max: 780px;
+  --game-circle-min: 360px;
+  --preview-circle-size: 416px;
+}
+
+.circle-size-option-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.circle-size-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.circle-size-option:hover {
+  border-color: rgba(92, 225, 230, 0.35);
+  color: var(--text-primary);
+}
+
+.circle-size-option.is-selected {
+  border-color: rgba(92, 225, 230, 0.55);
+  background: rgba(92, 225, 230, 0.08);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(92, 225, 230, 0.15);
+}
+
+.circle-size-option-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.circle-size-option-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.circle-size-option.is-selected .circle-size-option-desc {
+  color: var(--text-secondary);
+}
+
+.circle-size-preview {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 2px solid rgba(92, 225, 230, 0.55);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.12) 0%, rgba(20, 32, 58, 0.9) 55%, rgba(8, 12, 24, 0.95) 100%);
+  box-shadow: inset 0 0 24px rgba(139, 124, 248, 0.15);
+}
+
+.circle-size-preview-large {
+  width: 64px;
+  height: 64px;
+}
+
+.circle-size-preview-xlarge {
+  width: 74px;
+  height: 74px;
+}
+
+.circle-size-preview-venue {
+  width: 84px;
+  height: 84px;
+}
+
+@media (max-width: 900px) {
+  .circle-size-option-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .circle-size-option-grid {
+    grid-template-columns: 1fr;
+  }
 }

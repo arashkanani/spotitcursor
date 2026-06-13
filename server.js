@@ -339,7 +339,8 @@ function getEventPayload() {
     customBackgroundPosY: eventConfig.customBackgroundPosY ?? eventBrandingStore.DEFAULT_BG_POS,
     customBackgroundScale: eventConfig.customBackgroundScale ?? eventBrandingStore.DEFAULT_BG_SCALE,
     circlesPanelTransparent: !!eventConfig.circlesPanelTransparent,
-    rankingPanelTransparent: !!eventConfig.rankingPanelTransparent
+    rankingPanelTransparent: !!eventConfig.rankingPanelTransparent,
+    circleSize: eventBrandingStore.normalizeCircleSize(eventConfig.circleSize)
   };
 }
 
@@ -920,6 +921,9 @@ app.patch("/api/event-branding/theme", (req, res) => {
   if (req.body?.rankingPanelTransparent !== undefined) {
     eventConfig.rankingPanelTransparent = !!req.body.rankingPanelTransparent;
   }
+  if (req.body?.circleSize !== undefined) {
+    eventConfig.circleSize = eventBrandingStore.normalizeCircleSize(req.body.circleSize);
+  }
 
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
   const payload = getEventPayload();
@@ -1088,7 +1092,10 @@ app.put("/api/event-branding", (req, res) => {
     customBackgrounds,
     ...eventBrandingStore.primaryBackgroundTransform(customBackgrounds),
     circlesPanelTransparent: !!req.body?.circlesPanelTransparent,
-    rankingPanelTransparent: !!req.body?.rankingPanelTransparent
+    rankingPanelTransparent: !!req.body?.rankingPanelTransparent,
+    circleSize: eventBrandingStore.normalizeCircleSize(
+      req.body?.circleSize ?? eventConfig.circleSize
+    )
   });
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
