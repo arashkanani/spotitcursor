@@ -625,6 +625,12 @@
     let rankingPanelTransparent = false;
     let circleSize = "standard";
     const CIRCLE_SIZE_OPTIONS = new Set(["standard", "large", "xlarge", "venue"]);
+    const CIRCLE_SCALE_BY_SIZE = {
+      standard: 1,
+      large: 1.28,
+      xlarge: 1.58,
+      venue: 1.95
+    };
     let setupPhase = "customize";
 
     const DEFAULT_THEME_BACKGROUND = "midnight";
@@ -1589,6 +1595,7 @@
 
     function syncCircleSizeAttributes() {
       const size = normalizeCircleSize(circleSize);
+      const scale = CIRCLE_SCALE_BY_SIZE[size] || 1;
       const targets = [
         document.documentElement,
         document.body,
@@ -1600,6 +1607,7 @@
       for (const el of targets) {
         if (!el) continue;
         el.dataset.circleSize = size;
+        el.style.setProperty("--circle-scale", String(scale));
       }
     }
 
@@ -1619,6 +1627,7 @@
       }
       syncCircleSizeAttributes();
       syncCircleSizePickerUi();
+      refreshCircleLayoutAfterSizeChange();
     }
 
     function refreshCircleLayoutAfterSizeChange() {
@@ -1627,11 +1636,15 @@
         circleEl._shapeLayoutLocked = false;
         circleEl._shapeDisplayCache = null;
       }
-      if (setupPhase === "customize") {
-        scheduleDashboardPreview();
-      } else if (!gameView.classList.contains("hidden")) {
-        refreshCircleShapesDisplay();
-      }
+      requestAnimationFrame(() => {
+        fitSetupPreviewScale();
+        repositionDemoCircleShapes();
+        if (setupPhase === "customize") {
+          void refreshSetupLiveDemo();
+        } else if (!gameView.classList.contains("hidden")) {
+          refreshCircleShapesDisplay();
+        }
+      });
     }
 
     function syncPanelStyleAttributes() {

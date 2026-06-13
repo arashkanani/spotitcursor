@@ -330,8 +330,16 @@ button:disabled {
 }
 
 .circle {
-  width: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
-  height: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
+  width: min(
+    calc(44vw * var(--circle-scale, 1)),
+    calc(45vh * var(--circle-scale, 1)),
+    calc(480px * var(--circle-scale, 1))
+  );
+  height: min(
+    calc(44vw * var(--circle-scale, 1)),
+    calc(45vh * var(--circle-scale, 1)),
+    calc(480px * var(--circle-scale, 1))
+  );
   margin: 0 auto;
   border: 2px solid rgba(139, 124, 248, 0.5);
   border-radius: 999px;
@@ -376,9 +384,10 @@ button:disabled {
 
 .host-game .circle {
   aspect-ratio: 1;
-  min-width: var(--game-circle-min, 240px);
-  min-height: var(--game-circle-min, 240px);
+  min-width: calc(240px * var(--circle-scale, 1));
+  min-height: calc(240px * var(--circle-scale, 1));
   flex-shrink: 0;
+  max-width: none;
 }
 
 @keyframes slowPulse {
@@ -1929,8 +1938,8 @@ input::placeholder {
   }
 
   .circle {
-    width: min(85vw, 340px);
-    height: min(85vw, 340px);
+    width: min(calc(85vw * var(--circle-scale, 1)), calc(340px * var(--circle-scale, 1)));
+    height: min(calc(85vw * var(--circle-scale, 1)), calc(340px * var(--circle-scale, 1)));
   }
 
   .leaderboard-row {
@@ -2422,9 +2431,15 @@ input::placeholder {
   align-content: start;
 }
 
+.setup-game-preview-panel .setup-preview-inner .circles {
+  transform: scale(var(--circle-scale, 1));
+  transform-origin: center center;
+  transition: transform 0.2s ease;
+}
+
 .setup-game-preview-panel .setup-preview-inner .circle {
-  width: var(--preview-circle-size, 260px);
-  height: var(--preview-circle-size, 260px);
+  width: 260px;
+  height: 260px;
   aspect-ratio: 1;
   min-width: 0;
   min-height: 0;
@@ -2882,8 +2897,16 @@ body[data-pattern="spotlight"] .setup-preview-inner .layout {
 
 body[data-pattern="spotlight"] .host-game .circle,
 body[data-pattern="spotlight"] .setup-preview-inner .circle {
-  width: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
-  height: min(calc(var(--game-circle-vw, 44) * 1vw), calc(var(--game-circle-vh, 45) * 1vh), var(--game-circle-max, 480px));
+  width: min(
+    calc(44vw * var(--circle-scale, 1)),
+    calc(45vh * var(--circle-scale, 1)),
+    calc(480px * var(--circle-scale, 1))
+  );
+  height: min(
+    calc(44vw * var(--circle-scale, 1)),
+    calc(45vh * var(--circle-scale, 1)),
+    calc(480px * var(--circle-scale, 1))
+  );
 }
 
 body[data-pattern="stage"] .host-game .layout,
@@ -3355,37 +3378,20 @@ body.admin-body {
 }
 
 /* ——— Circle size presets ——— */
-:root,
-[data-circle-size="standard"] {
-  --game-circle-vw: 44;
-  --game-circle-vh: 45;
-  --game-circle-max: 480px;
-  --game-circle-min: 240px;
-  --preview-circle-size: 260px;
+html {
+  --circle-scale: 1;
 }
 
-[data-circle-size="large"] {
-  --game-circle-vw: 52;
-  --game-circle-vh: 54;
-  --game-circle-max: 560px;
-  --game-circle-min: 280px;
-  --preview-circle-size: 300px;
+html[data-circle-size="large"] {
+  --circle-scale: 1.28;
 }
 
-[data-circle-size="xlarge"] {
-  --game-circle-vw: 62;
-  --game-circle-vh: 64;
-  --game-circle-max: 660px;
-  --game-circle-min: 320px;
-  --preview-circle-size: 350px;
+html[data-circle-size="xlarge"] {
+  --circle-scale: 1.58;
 }
 
-[data-circle-size="venue"] {
-  --game-circle-vw: 72;
-  --game-circle-vh: 74;
-  --game-circle-max: 780px;
-  --game-circle-min: 360px;
-  --preview-circle-size: 416px;
+html[data-circle-size="venue"] {
+  --circle-scale: 1.95;
 }
 
 .circle-size-option-grid {
