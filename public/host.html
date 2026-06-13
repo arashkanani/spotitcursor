@@ -2612,7 +2612,18 @@
         selectedSponsorId = created.id;
         await loadSponsorCatalog();
         await openSponsorEdit(created.id, created.name);
-        setupMessage.textContent = `${created.name} saved — ${editShapeItems.length} circle shapes ready.`;
+        selectSponsor(created.id);
+        const persistResult = await persistSelectedSponsorForGame(created.id).catch((err) => ({
+          ok: false,
+          reason: err.message || "save_failed"
+        }));
+        if (persistResult?.ok && !persistResult.unchanged) {
+          setupMessage.textContent = `${created.name} saved and set for the live game — ${editShapeItems.length} shapes ready.`;
+        } else if (persistResult?.reason === "no_title") {
+          setupMessage.textContent = `${created.name} saved — enter an event title, then Continue to player lobby.`;
+        } else {
+          setupMessage.textContent = `${created.name} saved — ${editShapeItems.length} circle shapes ready.`;
+        }
       } catch (err) {
         setupMessage.textContent = err.message || "Could not save pack.";
       }
@@ -3650,7 +3661,10 @@
       primeGameAudio();
       hideGameChampionPanel();
       showGameView();
-      socket.emit("hostStartGame");
+      socket.emit("hostStartGame", {
+        sponsorId: selectedSponsorId,
+        title: String(eventTitleInput?.value || currentEventTitle || "").trim()
+      });
     });
 
     startBtn.disabled = true;

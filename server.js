@@ -453,7 +453,8 @@ function buildGameStatePayload() {
     leaderboard: getLeaderboard({ includePhoto }),
     playerCount: players.size,
     registrationOpen: !game.started || game.ended,
-    playerCap: effectiveMaxPlayers()
+    playerCap: effectiveMaxPlayers(),
+    eventBranding: getEventPayload()
   };
 }
 
@@ -1318,7 +1319,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("hostStartGame", () => {
+  socket.on("hostStartGame", (payload) => {
     const accessCode = socket.data.accessSession?.code || currentDashboardCode();
     if (!accessCode) {
       socket.emit("hostError", { message: "Dashboard access required. Please sign in with your access code." });
@@ -1342,6 +1343,34 @@ io.on("connection", (socket) => {
       });
       return;
     }
+
+    const requestedSponsorId = String(payload?.sponsorId || "").trim();
+    const requestedTitle = String(payload?.title || eventConfig.title || "").trim();
+    if (requestedSponsorId && requestedSponsorId !== eventConfig.sponsorId) {
+      const requestedSponsor = sponsors.getSponsorById(requestedSponsorId);
+      if (!requestedSponsor) {
+        socket.emit("hostError", { message: "Selected sponsor pack was not found on the server." });
+        return;
+      }
+      const applyResult = applySponsorToLiveEvent(requestedSponsor, requestedTitle);
+      if (!applyResult.ok) {
+        socket.emit("hostError", { message: applyResult.error });
+        return;
+      }
+    } else {
+      syncSponsorSelectionFromEventConfig();
+    }
+
+    const liveSponsor = eventConfig.sponsorId
+      ? sponsors.getSponsorById(eventConfig.sponsorId)
+      : null;
+    if (!liveSponsor || liveSponsor.shapeCount < sponsors.MIN_SHAPES_PER_SPONSOR) {
+      socket.emit("hostError", {
+        message: "Choose a sponsor pack with at least 19 PNG shapes before starting the game."
+      });
+      return;
+    }
+
     dashboardCodeId = accessCode.id;
     activeGameCodeId = accessCode.id;
     userStore.consumeAccessCodeUse(accessCode.id, {
