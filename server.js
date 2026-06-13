@@ -339,8 +339,7 @@ function getEventPayload() {
     customBackgroundPosY: eventConfig.customBackgroundPosY ?? eventBrandingStore.DEFAULT_BG_POS,
     customBackgroundScale: eventConfig.customBackgroundScale ?? eventBrandingStore.DEFAULT_BG_SCALE,
     circlesPanelTransparent: !!eventConfig.circlesPanelTransparent,
-    rankingPanelTransparent: !!eventConfig.rankingPanelTransparent,
-    wallScreenLayout: eventBrandingStore.normalizeWallScreenLayout(eventConfig.wallScreenLayout)
+    rankingPanelTransparent: !!eventConfig.rankingPanelTransparent
   };
 }
 
@@ -453,8 +452,7 @@ function buildGameStatePayload() {
     leaderboard: getLeaderboard({ includePhoto }),
     playerCount: players.size,
     registrationOpen: !game.started || game.ended,
-    playerCap: effectiveMaxPlayers(),
-    eventBranding: getEventPayload()
+    playerCap: effectiveMaxPlayers()
   };
 }
 
@@ -922,11 +920,6 @@ app.patch("/api/event-branding/theme", (req, res) => {
   if (req.body?.rankingPanelTransparent !== undefined) {
     eventConfig.rankingPanelTransparent = !!req.body.rankingPanelTransparent;
   }
-  if (req.body?.wallScreenLayout !== undefined) {
-    eventConfig.wallScreenLayout = eventBrandingStore.normalizeWallScreenLayout(
-      req.body.wallScreenLayout
-    );
-  }
 
   eventConfig = eventBrandingStore.writeEventConfig(eventConfig);
   const payload = getEventPayload();
@@ -1095,10 +1088,7 @@ app.put("/api/event-branding", (req, res) => {
     customBackgrounds,
     ...eventBrandingStore.primaryBackgroundTransform(customBackgrounds),
     circlesPanelTransparent: !!req.body?.circlesPanelTransparent,
-    rankingPanelTransparent: !!req.body?.rankingPanelTransparent,
-    wallScreenLayout: eventBrandingStore.normalizeWallScreenLayout(
-      req.body?.wallScreenLayout ?? eventConfig.wallScreenLayout
-    )
+    rankingPanelTransparent: !!req.body?.rankingPanelTransparent
   });
   const payload = getEventPayload();
   io.emit("eventBranding", payload);
