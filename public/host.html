@@ -2772,8 +2772,8 @@
     /** Even area coverage: golden-angle spiral + sqrt radius (fills disk homogeneously). */
     function buildHomogeneousCircleLayout(shapeCount, radius, minSize, maxSize, layoutSeed) {
       const tokens = [];
-      const margin = 5;
-      const inset = 8;
+      const margin = 2;
+      const inset = 6;
       const tokenSize = (minSize + maxSize) / 2;
       const tokenRadius = tokenSize / 2;
       const maxDist = Math.max(tokenRadius + 4, radius - tokenRadius - inset);
@@ -3015,8 +3015,9 @@
       }
 
       const radius = size / 2;
-      const minSize = size * 0.12;
-      const maxSize = size * 0.2;
+      const relSlotSize = list.length <= 10 ? 0.23 : list.length <= 14 ? 0.21 : 0.19;
+      const minSize = size * relSlotSize;
+      const maxSize = size * relSlotSize;
       const layout = ensureShapeLayout(list.length, radius, minSize, maxSize, layoutSeed);
       const seed = hashString(layoutSeed);
       const uniformDemo = isDemoCircleEl(circleEl);
@@ -3028,9 +3029,9 @@
           normX: slot.x / size,
           normY: slot.y / size,
           relSize: slot.size / size,
-          opacity: uniformDemo ? 1 : 0.45 + seededUnit(seed, 40 + index) * 0.5,
-          rotation: uniformDemo ? 0 : seededUnit(seed, 50 + index) * 56 - 28,
-          iconScale: uniformDemo ? 0.62 : 0.58
+          opacity: uniformDemo ? 1 : 0.9 + seededUnit(seed, 40 + index) * 0.1,
+          rotation: uniformDemo ? 0 : seededUnit(seed, 50 + index) * 24 - 12,
+          iconScale: uniformDemo ? 0.78 : 0.74
         };
       }).filter(Boolean);
 
