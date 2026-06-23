@@ -707,7 +707,14 @@ app.post("/api/access/login", (req, res) => {
     res.status(403).json({ error: DEMO_SUSPEND_MESSAGE, reason: "demo_suspended" });
     return;
   }
-  if ((code.usesCount || 0) >= (code.usesLimit || 0)) {
+  if (userStore.isAccessCodeExpired(code)) {
+    res.status(403).json({
+      error: "This access code has expired.",
+      reason: "expired"
+    });
+    return;
+  }
+  if (!userStore.hasAccessCodeUsesRemaining(code)) {
     res.status(403).json({
       error: "This access code has reached its maximum number of game launches.",
       reason: "uses_exhausted"
@@ -755,6 +762,23 @@ app.get("/api/admin/activity", authLib.requireAdmin, (req, res) => {
 
 app.get("/api/admin/access-codes", authLib.requireAdmin, (_req, res) => {
   res.json({ codes: userStore.listAccessCodes(), realGameRunning: isRealGameRunning() });
+});
+
+app.post("/api/admin/access-codes/weekly", authLib.requireAdmin, (req, res) => {
+  try {
+    const result = userStore.ensureWeeklyAccessCodes(5);
+    appendAudit({
+      req,
+      type: "access.weekly_ensure",
+      meta: {
+        created: result.created.length,
+        activeWeekly: result.weeklyCodes.length
+      }
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Could not create weekly codes." });
+  }
 });
 
 app.post("/api/admin/access-codes/:id/disable-regenerate", authLib.requireAdmin, (req, res) => {
@@ -1334,7 +1358,11 @@ io.on("connection", (socket) => {
       socket.emit("hostError", { message: DEMO_SUSPEND_MESSAGE });
       return;
     }
-    if ((accessCode.usesCount || 0) >= (accessCode.usesLimit || 0)) {
+    if (userStore.isAccessCodeExpired(accessCode)) {
+      socket.emit("hostError", { message: "This access code has expired." });
+      return;
+    }
+    if (!userStore.hasAccessCodeUsesRemaining(accessCode)) {
       socket.emit("hostError", { message: "This access code has no launches remaining." });
       return;
     }

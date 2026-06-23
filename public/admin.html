@@ -34,10 +34,13 @@
     <div class="admin-panels">
       <section class="admin-panel card admin-panel-wide">
         <div class="admin-panel-head">
-          <h2>Access codes (Demo / Real)</h2>
-          <button type="button" class="ghost-btn" id="reloadCodesBtn">Refresh</button>
+          <h2>Access codes (Demo / Weekly / Real)</h2>
+          <div class="admin-panel-actions">
+            <button type="button" class="ghost-btn" id="createWeeklyCodesBtn">Create 5 weekly codes</button>
+            <button type="button" class="ghost-btn" id="reloadCodesBtn">Refresh</button>
+          </div>
         </div>
-        <p class="admin-panel-hint">Disable any code to immediately generate a fresh replacement of the same tier. Force logout clears all active sessions using that code.</p>
+        <p class="admin-panel-hint">Weekly codes are valid for 7 days and have unlimited game launches. Disable any code to immediately generate a fresh replacement of the same tier.</p>
         <div class="admin-table-wrap">
           <table class="admin-table admin-table-compact">
             <thead>
@@ -46,6 +49,7 @@
                 <th>Username</th>
                 <th>Password</th>
                 <th>Usage</th>
+                <th>Expires</th>
                 <th>Last usage</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -192,6 +196,7 @@
         ["Account games started", data.accountGamesHosted],
         ["Mobile game sessions", data.mobileGameSessions],
         ["Active demo codes", data.accessCodes?.demo ?? 0],
+        ["Active weekly codes", data.accessCodes?.weekly ?? 0],
         ["Active real codes", data.accessCodes?.real ?? 0]
       ];
       adminSummary.innerHTML = cards
@@ -233,8 +238,8 @@
       codesTableBody.innerHTML = "";
       for (const code of codes) {
         const tr = document.createElement("tr");
-        const usage = `${code.usesCount || 0} / ${code.usesLimit || 0}`;
-        const status = code.disabled ? "Disabled" : "Active";
+        const usage = code.unlimitedUses ? `${code.usesCount || 0} / Unlimited` : `${code.usesCount || 0} / ${code.usesLimit || 0}`;
+        const status = code.disabled ? "Disabled" : code.expired ? "Expired" : "Active";
         const disabledBtn = code.disabled
           ? `<span class="admin-empty">Replaced</span>`
           : `<button class="ghost-btn" data-disable-code="${escapeHtml(code.id)}">Disable & regenerate</button>`;
@@ -246,6 +251,7 @@
           <td>${escapeHtml(code.username || "—")}</td>
           <td>${escapeHtml(code.password || "—")}</td>
           <td>${escapeHtml(usage)}</td>
+          <td>${escapeHtml(formatDate(code.expiresAt))}</td>
           <td class="admin-cell-wrap">${escapeHtml(formatCodeLastUsage(code))}</td>
           <td>${escapeHtml(status)}</td>
           <td>${disabledBtn} ${forceBtn}</td>
@@ -253,7 +259,7 @@
         codesTableBody.appendChild(tr);
       }
       if (!codes.length) {
-        codesTableBody.innerHTML = '<tr><td colspan="7" class="admin-empty">No access codes found.</td></tr>';
+        codesTableBody.innerHTML = '<tr><td colspan="8" class="admin-empty">No access codes found.</td></tr>';
       }
     }
 
@@ -309,6 +315,19 @@
     document.getElementById("reloadUsersBtn")?.addEventListener("click", () => loadUsers().catch((e) => showErr(e.message)));
     document.getElementById("reloadMobileBtn")?.addEventListener("click", () => loadMobilePlayers().catch((e) => showErr(e.message)));
     document.getElementById("reloadCodesBtn")?.addEventListener("click", () => loadAccessCodes().catch((e) => showErr(e.message)));
+    document.getElementById("createWeeklyCodesBtn")?.addEventListener("click", async (ev) => {
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+      try {
+        const data = await ShapeMatchAuth.apiFetch("/api/admin/access-codes/weekly", { method: "POST" });
+        await Promise.all([loadAccessCodes(), loadSummary()]);
+        alert(`Weekly codes ready. Created ${data.created?.length || 0} new code(s).`);
+      } catch (err) {
+        showErr(err.message || "Could not create weekly codes.");
+      } finally {
+        btn.disabled = false;
+      }
+    });
     document.getElementById("reloadActivityBtn")?.addEventListener("click", () => {
       activityOffset = 0;
       loadActivity({ append: false }).catch((e) => showErr(e.message));
